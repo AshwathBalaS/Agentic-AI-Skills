@@ -12,6 +12,8 @@
 
 **E) Getting up with LangSmith API Key**
 
+**F) Creating a Simple Graph or Workflow using LangGraph - Building Nodes and Edges**
+
  #### Always create .env file in the venv - It is for LLM Models, OpenAI Keys, GroQ Keys, LangSmith keys [All those Environment variables and keys we will be storing there]
 
 **A) UV for creating Virtual Environment**
@@ -105,3 +107,86 @@ For OpenAI API Keys, we need to put some credit cards, and load some amount of M
 6. Once created an API Key, copy it and paste in VS Code on .env on "LANGCHAIN_API_KEY=YOUR_API_KEY"
 
 #### Whenever we create any applications with help of LangGraph, once we run, all the Logs, all the monitoring, should happen in LangGraph Platform
+
+**F) Creating a Simple Graph or Workflow using LangGraph - Building Nodes and Edges**
+
+We don't use any LLM's here; We just use Nodes and Edges
+
+**Coding Part:**
+
+from typing_extensions import TypedDict
+
+class State(TypedDict):
+    graph_info:strf
+
+**The state will be holding information in graph_info**
+
+**If our Graph wants to return some information, we use from typing_extensions import TypedDict; TypeDict creates a dictionary type such that type checker will expect all instances to have a certain set of keys, where each key is associated with a value of consistent type. This expectation is not checked at the runtime; We can define all of them in a particular variable later; If we add that in class, we can represent as Dictionaries later**
+
+**graph_info - Whenever we move from one node to another, this will be the information we will be sharing**
+
+**State - First, define the State of the graph. The State schema serves as the input schema for all Nodes and Edges in the graph. Let's use the TypedDict class from python's typing module as our schema, which provides type hints for the keys.**
+
+**Node - Nodes are just python functions. The first positional argument is the state, as defined above. Because the state is a TypedDict with schema as defined above, each node can access the key, graph_state, with state['graph_state']. Each node returns a new value of the state key graph_state. By default, the new value returned by each node will override the prior state value.**
+
+def start_play(state:State):
+    print("Start_Play node has been called")
+    return {"graph_info":state['graph_info'] + " I am planning to play"}
+
+#### **As soon as we start the execution of the flow, graph_info is nothing but the variable inside the class, which is acting as a schema. Every node which we execute should over write that particular value**
+
+#### It should have the updated value as soon as the every node is executed; That is the reason we are returing as a key-value pair in the form of a dictionary like a graph_info=state graph_info and we added + "I am planning to play". This is the first Node that is getting executed in this Workflow
+
+#### As soon as the start flow is getting executed, we are taking the previous information of whatever graph value was there and adding one more statement "I am planning to play", just to say that my node has got executed successfully. That is the first node;
+
+def cricket(state:State):
+    print("My Cricket node has been called")
+    return {"graph_info":state['graph_info'] + " Cricket"}
+
+### state['graph_info'] will already have the info that "I am planning to play", if this node gets executed, we will get "Cricket" gets printed along with that; This is what happens when we get Cricket Node gets executed
+
+def badminton(state:State):
+    print("My badminton node has been called")
+    return {"graph_info":state['graph_info'] + " Badminton"}
+
+### Here instead of Cricket, we have Badmiton node gets executed; Two edges are called over there for the conditional check; This is what three nodes got created
+
+### Now we will create edges to connect the nodes; How to know, to go to which edge, we need to explicitly define some condition
+
+import random
+from typing import Literal
+
+def random_play(state:State)-> Literal['cricket','badminton']:
+    graph_info=state['graph_info']
+    if random.random()>0.5:
+        return "cricket"
+    else:
+        return "badminton"
+
+**We created one more function; Literal means constant; This above function will be responsible on deciding which edge we should go**
+
+**State will be of state; Return type will be Literal, means constant, it should be of two options only; It should either return cricket or it should return Badmiton; If we have football, we can go ahead and write that too**
+
+**We are getting previous graph_info; if random.random>0.5, return cricket, else return Badmiton; It just selects only random number, if it is greater than 0.5 it returns cricket or it returns badmiton**
+
+### Start Play is the node and from there we need to call the Function, decide play and it will either go in left or in right direction; Reason for hardcoding is those are the name of the nodes; Cricket and Badmiton should be same in the codes
+
+**We have created nodes and also created the edge conditions, now we need to create our Graph**
+
+#### Graph Construction
+
+Now, we build the graph from our components defined above.
+
+The StateGraph class is the graph class that we can use.
+
+First, we initialize a StateGraph with the State class we defined above.
+
+Then, we add our nodes and edges.
+
+We use the START Node, a special node that sends user input to the graph, to indicate where to start our graph.
+
+The END Node is a special node that represents a terminal node.
+
+Finally, we compile our graph to perform a few basic checks on the graph structure.
+
+We can visualize the graph as a Mermaid diagram.
