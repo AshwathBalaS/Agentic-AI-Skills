@@ -14,6 +14,8 @@
 
 **F) Creating a Simple Graph or Workflow using LangGraph - Building Nodes and Edges**
 
+**G) Building Simple Graph StateGraph and Graph Compiling**
+
  #### Always create .env file in the venv - It is for LLM Models, OpenAI Keys, GroQ Keys, LangSmith keys [All those Environment variables and keys we will be storing there]
 
 **A) UV for creating Virtual Environment**
@@ -190,3 +192,66 @@ The END Node is a special node that represents a terminal node.
 Finally, we compile our graph to perform a few basic checks on the graph structure.
 
 We can visualize the graph as a Mermaid diagram.
+
+**G) Building Simple Graph StateGraph and Graph Compiling**
+
+**State Schema is created and now we need to create our Graph**
+
+**For constructing our Graph, we will be using StateGraph; It is a Class provided by LangGraph itself; With help of it we can define entire structure of the Graph and which node will be connected to what other nodes and what will be the flow of executions; Everything will be able to decide with help of this StateGraph**
+
+**Coding Part:**
+
+from IPython.display import Image,display **To display the Graph itself**
+
+from langgraph.graph import StateGraph,START,END **StateGraph is responsible in creating the entire graph or graph of the Workflow**
+
+## Build Graph
+
+graph=StateGraph(State) **Initializing the StateGraph to define the workflow**
+
+## Adding the nodes
+
+graph.add_node("start_play",start_play)
+
+graph.add_node("cricket",cricket)
+
+graph.add_node("badminton",badminton)
+
+## Schedule the flow of the graph (As we planned in the Image)
+
+graph.add_edge(START,"start_play")
+
+### In LangGraph we have add_conditional_edges, to decid the condition 
+
+graph.add_conditional_edges("start_play",random_play) **After we start, we need to call the function, which decide the game to play; This random_play will decide which node to call; If cricket automatically cricket node will be called; If Badmiton automatically Badmiton node will be called**
+
+graph.add_edge("cricket",END) **To call cricket node**
+ 
+graph.add_edge("badminton",END) **To call badmiton node**
+
+## Compile the graph
+
+graph_builder=graph.compile() **Compiling the Graph to visualize it**
+
+## Viewing the Graph
+
+display(Image(graph_builder.get_graph().draw_mermaid_png()))
+
+**First we added all the nodes; Names can be different but make sure to provide the same name as the function name so there won't be any confusion; Then we added start play, then random_play which decides which node to call, cricket or badmiton, whichever it calls, that node gets executed; Then added edges for Cricket and Badmiton; Random play is calling cricket or badmiton**
+
+### GRAPH Invocation - To invoke the Graph
+
+graph_builder.invoke({"graph_info":"Hey My name is Krish"})
+
+**Once we give this, it will go and start after adding My Name is "I am planning to play", then it will call the function random_play, then decide which node to call, whichever node it calls that node gets executed; That message will keep on getting appended**
+
+**We will get output as sometimes I play cricket and sometimes I play Badmiton**
+
+**Outputs were :Start_Play node has been called
+My badminton node has been called; {'graph_info': 'Hey My name is Ashwath I am planning to play Badminton'}**
+
+**We gave output for "Start_Play node has been called" because to debug what has happened**
+
+**We didn't use any LLM here; Next we will use same workflow and create a chatbot; As we go ahead we will create more complex workflows and chatbot will be able to do multiple tasks**
+
+**We will use LLM for nodes; LLM's can generate blogs, poems, jokes, anything it can do**
