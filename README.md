@@ -316,7 +316,7 @@ display(Image(graph_builder.get_graph().draw_mermaid_png()))
 
 # Streaming the Responses - for event in graph_builder.stream({"messages":"Hello My name is KRish"}): print(event)
 
-#### If we want to have only the recent message we can use this; Streaming will help, when we develop end to end applications
+#### If we want to have only the recent message we can use this; Streaming will help, when we develop end to end applications; By default, "stream_mode" is "update", so we will get only AI Message; We will learn about "stream_mode=values" later
 
 #### If we use "stream_mode="values" or "updates"", there is a possibility that we can get both human and AI Reponse; But that Krish will cover later in the course
 
