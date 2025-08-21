@@ -16,6 +16,10 @@
 
 **G) Building Simple Graph StateGraph and Graph Compiling**
 
+**H) Developing LLM Powered Simple Chatbot using LangGraph**
+
+**AA) Demo of MCP with Claude Desktop**
+
  #### Always create .env file in the venv - It is for LLM Models, OpenAI Keys, GroQ Keys, LangSmith keys [All those Environment variables and keys we will be storing there]
 
 **A) UV for creating Virtual Environment**
@@ -255,3 +259,67 @@ My badminton node has been called; {'graph_info': 'Hey My name is Ashwath I am p
 **We didn't use any LLM here; Next we will use same workflow and create a chatbot; As we go ahead we will create more complex workflows and chatbot will be able to do multiple tasks**
 
 **We will use LLM for nodes; LLM's can generate blogs, poems, jokes, anything it can do**
+
+**H) Developing LLM Powered Simple Chatbot using LangGraph**
+
+**Flow:** Start --> Superbot (Chatbot) [Can be OpenAI LLM or Groq Open Source LLM] --> End
+
+1. **Reducers** - from typing import Annotated; from langgraph.graph.message import add_messages
+
+add_messages - Merge Two list of messages, updating existing messages by ID, State is append only, unless new message has the same ID as existing message
+
+Annotated - It will go and annotate with respect to every messages; It is also a List; Human Message, AI Message will be there; we need to annotate it with help of Annotator; We will annotate for the list of messages
+
+### Add Message is used here to append all the list of messages, keeping it a track; As we have conversation with SuperBot; It is a reducer here
+
+It will be a Key value pair
+
+#### Very Important below to Import Models to Environment
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+os.environ["OPENAI_API_KEY"]=os.getenv("OPENAI_API_KEY")
+os.environ["GROQ_API_KEY"]=os.getenv("GROQ_API_KEY")
+
+from langchain_openai import ChatOpenAI
+llm=ChatOpenAI(model="gpt-4o")
+
+#### Invoking the Model: Start the convo and gives reply like "Hi, How can I help you"; llm.invoke("Hello")
+
+**Creating the Grpah:**
+
+def superbot(state:State):
+    return {"messages":[llm_groq.invoke(state['messages'])]}
+
+graph=StateGraph(State)
+
+## node
+graph.add_node("SuperBot",superbot)
+## Edges
+
+graph.add_edge(START,"SuperBot")
+graph.add_edge("SuperBot",END)
+
+
+graph_builder=graph.compile()
+
+
+## Display
+from IPython.display import Image, display
+display(Image(graph_builder.get_graph().draw_mermaid_png()))
+
+## Invocation - graph_builder.invoke({'messages':"Hi,My name is Krish And I like cricket"})
+
+### If we don't use the Reducer, it won't get appended in Invocation; User Message and the AI Message; We will get only the recent message
+
+# Streaming the Responses - for event in graph_builder.stream({"messages":"Hello My name is KRish"}): print(event)
+
+#### If we want to have only the recent message we can use this; Streaming will help, when we develop end to end applications
+
+#### If we use "stream_mode="values" or "updates"", there is a possibility that we can get both human and AI Reponse; But that Krish will cover later in the course
+
+
+
+
