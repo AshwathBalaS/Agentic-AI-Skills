@@ -78,6 +78,16 @@
 
 **G) Evaluator-optimizer**
 
+**XIII) Human in the Loop in LangGraph**
+
+**A) Human In The Loop With LangGraph Workflows**
+
+**B) Human In the Loop Continuation**
+
+**C) Editing Human Feedback In Workflow**
+
+**D) Runtime Human Feedback In Workflow**
+
 **XIX) Model Context Protocol**
 
 **AA) Demo of MCP with Claude Desktop**
@@ -1991,5 +2001,283 @@ Summary:
 4. Accepted output: Content passes evaluation and proceeds to final output.
 
 This workflow is ideal for iterative refinement, human-in-the-loop setups, and quality-controlled content generation.
+
+# **XIII) Human in the Loop in LangGraph**
+
+**A) Human In The Loop With LangGraph Workflows**
+
+So we are going to continue our discussion on the line graph series. In the previous videos, we have already covered different types of workflows, how to debug a line graph application, and some advanced as well as basic topics such as creating chatbots, working with Pedantic, and understanding what React agents are. Now, it’s time to dive into a new module called Human in the Loop.
+
+So, what does human in the loop mean? Up until now, the workflows we have developed were fully autonomous, executing without any human intervention. However, whenever we deal with complex workflows, it’s beneficial to include human intervention at certain points. This human feedback can help make workflow execution more accurate and reliable. Essentially, human in the loop allows us to pause a workflow at specific points, get approval, or receive feedback before continuing. This can be particularly helpful in scenarios requiring task approvals or debugging, where we may want to rewind a graph to reproduce or prevent issues.
+
+Let’s see an example to illustrate this concept. In this workflow, the assistant will receive input and a human feedback interrupt will be applied before the assistant executes. For instance, if we define custom tools such as addition, subtraction, multiplication, and division, when a user inputs “What is 2 + 2?”, the request goes to the assistant first. Before execution, it is interrupted to request human confirmation. If permission is granted, the assistant executes the tool call and continues to the next step, again pausing for feedback if needed, until it reaches the end.
+
+To implement this, the first step is to load necessary libraries and environment variables:
+
+from dotenv import load_dotenv
+from langchain.grok.chat import Grok
+import os
+
+load_dotenv()
+grok_api = os.getenv("GROK_API")
+model = "qwq-32b"
+
+
+Note that the previous model version has been decommissioned, so we are using the updated qwq-32b model.
+
+Next, we define some custom tools for arithmetic operations. Each function should include a docstring so that the LLM can understand how to use it:
+
+def multiply(a: int, b: int) -> int:
+    """Multiply A and B"""
+    return a * b
+
+def add(a: int, b: int) -> int:
+    """Add A and B"""
+    return a + b
+
+def divide(a: int, b: int) -> float:
+    """Divide A by B"""
+    return a / b
+
+tools = [add, multiply, divide]
+
+
+After defining the tools, we bind them to the language model:
+
+lm_with_tools = LM.bind_tools(tools)
+
+
+Now, we can create our workflow using line graph. The workflow consists of nodes such as start, assistant, tools, and end. The assistant communicates with the tools, and outputs return back to the assistant. Human feedback is applied using an interrupt before clause.
+
+We import the necessary libraries to build the graph:
+
+from langchain.graph import MessageState, StateGraph, ToolNode, ToolCondition
+from langchain.core.messages import IMessage, HumanMessage, SystemMessage
+from langchain.graph import MemorySaver
+
+
+We start by defining a system message to instruct the LLM:
+
+system_message = SystemMessage(
+    content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
+)
+
+
+Next, we define the assistant node using a MessageState:
+
+def assistant(state: MessageState) -> MessageState:
+    messages = state.messages
+    messages.append(lm_with_tools.invoke(system_message=system_message, messages=messages))
+    return state
+
+
+After defining the node, we create the state graph and add nodes and edges:
+
+builder = StateGraph(MessageState)
+builder.add_node("assistant", assistant)
+builder.add_node("tools", ToolNode(tools))
+builder.add_edge("start", "assistant")
+builder.add_conditional_edge("assistant", "tools", condition=ToolCondition())
+builder.add_edge("tools", "assistant")
+
+memory = MemorySaver()
+graph = builder.compile(checkpointer=memory)
+
+
+We can also display the graph as an image to visualize the workflow. To add human feedback, we apply the interrupt_before parameter in the assistant node:
+
+graph.add_interrupt_before("assistant")
+
+
+Finally, we can execute the workflow and stream the output. Each step waits for human permission at the specified interrupt point:
+
+thread_id = "123"
+message = "multiply 2 and 3"
+
+for event in graph.stream(input=message, thread_id=thread_id, stream_mode="values"):
+    event_message = event.messages[-1]
+    print(event_message)
+
+
+When executed, the workflow stops at the human feedback interrupt, pausing before the assistant executes. This demonstrates how human in the loop works to ensure that the workflow only continues after human approval. In the next video, we will see how to continue execution after the interruption.
+
+So, in summary, human in the loop allows us to include human feedback in otherwise autonomous workflows by using interrupt_before or interrupt_after, which helps in debugging, validation, and task approval, making the workflow more robust and controlled.
+
+**B) Human In the Loop Continuation**
+
+In our previous video, we executed a workflow where we applied an interrupt before the assistant. As soon as we ran graph.stream with a message like "multiply 2 and 3", the input went to the assistant and the workflow got interrupted. This interruption pauses execution and allows the human to provide feedback or take action. At this stage, if we print the event message using event_message.PrettyPrint(), we only see the human message because the interruption happens before the assistant executes.
+
+To understand what the next step in the workflow is, we can use the graph.get_state method. For example:
+
+state = graph.get_state(thread_id=thread_id)
+print(state.next)
+
+
+Here, state.next tells us that the next state is the assistant node. This is because the workflow paused at the human feedback interrupt. Similarly, if we want to see the current state snapshot, we can run:
+
+state = graph.get_state(thread_id=thread_id)
+print(state)
+
+
+The current state snapshot contains information about the human message ("multiply 2 and 3") and other metadata. This snapshot represents the checkpoint of the workflow at the point of interruption. If we want to review the history of all checkpoints, we can use:
+
+history = graph.get_state_history(thread_id=thread_id)
+
+
+This generates an object containing all the state checkpoints in the workflow, showing how the workflow has progressed so far.
+
+Now, to continue the execution of the workflow after the human feedback interrupt, we simply call graph.stream again without passing any new message. For example:
+
+for event in graph.stream(input=None, thread_id=thread_id, stream_mode="values"):
+    event.messages[-1].PrettyPrint()
+
+
+Here, input=None signals that we want to continue execution without adding new input. The workflow moves to the next state, which in this case is the assistant node. The assistant then decides if a tool call is required. If a tool is called, such as our custom multiply tool, it executes the function and returns the result. After the tool executes, because the interrupt_before parameter is still active, the workflow pauses again for potential human feedback.
+
+Once the human confirms by continuing execution, the assistant receives the tool output and the workflow finally proceeds to the end node. The complete execution flow for our example "multiply 2 and 3" looks like this:
+
+The message goes to the assistant.
+
+The workflow interrupts before the assistant for human feedback.
+
+After human confirmation, the assistant executes.
+
+If a tool call is required, it goes to the tool node.
+
+The tool executes and returns the output to the assistant.
+
+Another interruption occurs before the assistant to allow human feedback again.
+
+After human confirmation, the assistant completes execution.
+
+The workflow moves to the end state.
+
+This process highlights the role of human feedback in controlling workflow execution. The human can either provide input, modify messages, or simply continue execution by passing None. Using checkpoints, state snapshots, and state history, we can monitor the workflow’s current and next states at every stage.
+
+In the next example, we will explore how to edit human feedback during execution. Instead of just continuing the workflow, the human can modify the input or provide custom messages, and the workflow will incorporate this feedback into subsequent steps. This allows us to dynamically control and refine workflow execution.
+
+Overall, in this video we learned about state snapshots, graph.get_state, graph.get_state_history, checkpoints, and how human feedback is integrated via interrupts. Continuing execution is as simple as passing None, and in the next step, we will see how human-provided edits affect the workflow.
+
+**C) Editing Human Feedback In Workflow**
+
+We are continuing our discussion on the human-in-the-loop topic with respect to Line Graph. In the previous video, we learned how to add an interrupt within a workflow and continue execution when a human simply gives permission, like "Hey, continue the execution". In this video, we’ll go a step further and learn how to edit human feedback dynamically during workflow execution.
+
+Setting Up the Workflow
+
+We will use the same graph as before—the one that interrupts before the assistant. You can also configure interrupts after the assistant, before a tool, or after a tool by specifying the node names.
+
+Here’s how we start:
+
+# Define the human input and thread
+human_message = "Multiply 2 and 3"
+thread_id = 1  # Using the same thread
+
+# Execute the graph with the human input
+for event in graph.stream(input=human_message, thread_id=thread_id):
+    event.messages[-1].PrettyPrint()
+
+
+At this stage, the workflow interrupts before the assistant, so if we check the state:
+
+state = graph.get_state(thread_id=thread_id)
+print(state.next)  # Output: assistant
+
+
+We can see that the next state is the assistant, but before moving forward, we can edit the human message.
+
+Editing Human Feedback
+
+Suppose we want to change the input from "Multiply 2 and 3" to "Multiply 15 and 6". We can do this using the update_state method:
+
+# Update the human message
+updated_message = [
+    {"role": "human", "content": "Please multiply 15 and 6"}
+]
+
+graph.update_state(
+    thread_id=thread_id,
+    messages=updated_message
+)
+
+
+Now, if we check the state again:
+
+new_state = graph.get_state(thread_id=thread_id)
+print(new_state.values())
+
+
+We will see that the human message has been updated to "Please multiply 15 and 6".
+
+Continuing Execution
+
+Once the human feedback is updated, we can continue execution without providing additional input:
+
+# Continue execution
+for event in graph.stream(input=None, thread_id=thread_id, stream_mode="values"):
+    event.messages[-1].PrettyPrint()
+
+
+Here’s what happens next:
+
+The workflow moves to the assistant.
+
+The assistant recognizes a tool call (our multiply tool).
+
+The tool executes with the updated arguments (15 and 6) and returns the result (90).
+
+The workflow interrupts again before the assistant, waiting for human confirmation.
+
+We can continue execution once more:
+
+# Final continuation
+for event in graph.stream(input=None, thread_id=thread_id, stream_mode="values"):
+    event.messages[-1].PrettyPrint()
+
+
+Finally, the assistant outputs the result:
+
+The result of multiplying 15 and 6 is 90
+
+Key Takeaways
+
+You can edit human messages during execution using graph.update_state.
+
+Workflow execution can pause for human input at any node using interrupt_before or interrupt_after.
+
+Continuing execution without new input is as simple as passing None to graph.stream.
+
+The tool receives the updated human message, executes the logic, and the workflow can be interrupted again before the assistant.
+
+Next Steps
+
+In the next video, we will explore waiting for user input dynamically during workflow execution. This will allow the workflow to pause until the human provides input, which can then be used to edit messages or continue execution. For that, we will create a new graph configuration that interrupts before the node where human feedback is expected.
+
+This video covers two major points:
+
+Editing human feedback dynamically.
+
+Properly continuing execution while involving human input using interrupts.
+
+In the next video, we’ll focus on waiting for real-time user input and how to integrate it into the workflow execution seamlessly.
+
+**D) Runtime Human Feedback In Workflow**
+
+In this tutorial, we will explore human-in-the-loop workflows using LineGraph, where a workflow can pause for human input, allow editing of messages, and continue execution dynamically. This is useful when you want humans to review or modify the messages before the assistant or tool processes them.
+
+We start by defining a system message for our assistant. The system message initializes the assistant and guides its behavior. For example, we can write "system_message = {'role': 'system', 'content': 'You are a helpful assistant tasked with performing arithmetic on a set of inputs.'}". This system message ensures that the assistant knows its role and expected operations.
+
+Next, we define the nodes for the workflow. The first node is the human feedback node, which initially can be empty since the human will provide input dynamically. We define it as "def human_feedback(state): return state". This function simply returns the state for now, and we will update it later with actual human input. The assistant node processes the input and optionally calls tools. It can be defined as "def assistant(state): return messages_with_tools.invoke_system_message + state". The tool node is already defined for arithmetic operations, such as multiplication.
+
+After defining the nodes, we build the graph structure using a Builder and a MemorySaver for checkpoints. We can write "builder = Builder(state=graph_message_state)" to initialize the builder. We add nodes using "builder.add_node('human_feedback', human_feedback)", "builder.add_node('assistant', assistant)", and "builder.add_node('tools', tool_node)". Next, we define the edges to control the workflow: "builder.add_edge('start', 'human_feedback')", "builder.add_edge('human_feedback', 'assistant')". Conditional edges from the assistant allow branching: "builder.add_conditional_edge('assistant', 'tools', condition='is_tool_call')", "builder.add_edge('assistant', 'end')". Finally, the edge from the tool back to human feedback is "builder.add_edge('tools', 'human_feedback')". We then compile the graph with interruption before the human feedback node: "memory = MemorySaver()" and "graph = builder.compile(interrupt_before='human_feedback', checkpoint=memory)". Displaying the graph with "graph.display()" shows the full workflow from start to human feedback, assistant, tools, and end.
+
+To execute the workflow, we first provide an initial message and a unique thread ID: "initial_message = 'Multiply 2 and 3'" and "thread_id = 5". We start streaming events with "for event in graph.stream(input=initial_message, thread_id=thread_id): event.messages[-1].PrettyPrint()". The workflow will immediately interrupt at the human feedback node, waiting for input. Here, we can collect human input using "user_input = input('Tell me how you want to update the state: ')". Once we receive the input, we update the human feedback node in the state using "graph.update_state(thread_id=thread_id, messages=[{'role': 'human', 'content': user_input}])". For example, the user might update the message to "Multiply 5 and 6" instead of "Multiply 2 and 3".
+
+After updating the human message, we continue workflow execution with "for event in graph.stream(input=None, thread_id=thread_id, stream_mode='values'): event.messages[-1].PrettyPrint()". At this stage, the assistant node will process the updated human input. If a tool call is required, the assistant invokes the tool with the new arguments. The tool performs the computation (in this case, multiplication) and returns the result. The workflow may interrupt again if human feedback is needed after the tool output. Continuing with "input=None" allows the workflow to proceed to the end, producing the final output. For example, after multiplying 5 and 6, the tool returns 30, and the final message could be "The result of multiplying 5 and 6 is 30".
+
+This workflow demonstrates several key points: the state snapshot records the current state of execution at every node, and graph.get_state(thread_id) can be used to inspect it. The checkpoints are saved in memory using MemorySaver, and graph.get_state_history(thread_id) can be used to inspect all previous states. We can edit human input dynamically, either before the assistant processes it or after a tool node completes, ensuring human oversight. Interrupts can be placed before or after any node, giving flexibility for designing complex human-in-the-loop flows. Frameworks like Streamlit or other UI frameworks can be used to collect user input interactively, making it more user-friendly than a simple console input.
+
+Overall, this tutorial covers three main aspects of human-in-the-loop workflows: interrupts before nodes, editing human feedback dynamically, and waiting for human input before continuing execution. You can experiment by adding more nodes, conditional branches, or multiple tool calls. For example, you can place interrupts after the assistant, or add additional assistant nodes to process intermediate results. This approach ensures that humans are always in control of critical decisions while the workflow executes smoothly.
+
+By combining graph.stream(), update_state(), get_state(), and get_state_history(), we can create robust, interactive workflows where human input is incorporated at any stage. This makes LineGraph a powerful tool for building intelligent systems that require human oversight or dynamic decision-making.
 
 
