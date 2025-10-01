@@ -58,6 +58,26 @@
 
 **M) Streaming using astream events Using Langgraph**
 
+**XI) Debugging LangGraph Application With LangSmith**
+
+**A) LangGraph Studio**
+
+**XII) Different Workflows In LangGraph**
+
+**A) Prompt Chaining**
+
+**B) Prompt Chaining Implementation With Langgraph**
+
+**C) Parallelization**
+
+**D) Routing**
+
+**E) Orchestrator-Worker**
+
+**F) Orchestrator Worker Implementation**
+
+**G) Evaluator-optimizer**
+
 **XIX) Model Context Protocol**
 
 **AA) Demo of MCP with Claude Desktop**
@@ -1056,5 +1076,920 @@ You can also access specific fields such as metadata or graph_node, which shows 
 In short, the stream_events method provides more detailed streaming than the regular .stream() method, giving you access not just to graph state but also to events, nodes, and partial messages. This complements the understanding of .stream() with stream_mode parameters values and updates, allowing you to control whether the full graph state or only the recent updates are streamed.
 
 I hope this example makes the differences clear and demonstrates the power of streaming events in real time. This was it from my side. I will see you in the next video. Have a great day! Bye bye.
+
+# **XI) Debugging LangGraph Application With LangSmith**
+
+**A) LangGraph Studio**
+
+So we are going to continue the discussion with respect to our LangGraph series. In our previous video, we discussed streaming and in-streaming, covering both .stream and a.stream methods. We also talked about additional parameters like values and updates, and understood the differences between them.
+
+In this specific video, we are going to discuss how you can debug complex workflows that you develop using LangGraph. These workflows are very important because they allow you to debug the entire application and understand the output after each node. If you want to make changes in prompt engineering, you should be able to do that on the fly. Debugging helps identify mistakes and optimize workflows.
+
+For this purpose, we will specifically use LangGraph Studio. First, I will create a folder named debugging as our working directory. Then, we will set up LangGraph Studio and visualize the workflow we create. To begin, we will go to LangChain
+ and navigate to LangSmith, where you can trace projects. LangGraph deployments are available in the LangGraph Platform, which helps visualize and debug the workflow.
+
+Inside the debugging folder, we start by creating a Python file called openai_agent.py. This file will contain our workflow. We first import the required libraries:
+
+from typing import Annotated
+from langgraph import StateGraph, AddMessages, ToolNode
+from openai import ChatOpenAI
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+
+We use environment variables to store the OpenAI API key and a custom login_API_key for our workflow.
+
+Next, we define a class called State that inherits from dict. Inside this class, we create a messages variable using Annotated to store a list of messages and apply the AddMessages reducer to continuously append new messages:
+
+class State(dict):
+    messages: Annotated[list, AddMessages()]
+
+
+We initialize a chat model using OpenAI's GPT-4 with zero temperature:
+
+chat_model = ChatOpenAI(model_name="gpt-4", temperature=0)
+
+
+Then, we create a function called make_default_graph to define our workflow:
+
+def make_default_graph():
+    graph_workflow = StateGraph(State)
+    def call_model(state):
+        return state.messages
+    graph_workflow.add_node("agent", call_model)
+    graph_workflow.add_edge("start", "agent")
+    graph_workflow.add_edge("agent", "end")
+    agent = graph_workflow.compile()
+    return agent
+
+
+Here, we define a node called agent that calls the model and returns the messages. We then define the edges for workflow execution from start → agent → end, and compile the workflow into an agent.
+
+Once the agent is defined, we call it to initialize:
+
+agent = make_default_graph()
+
+
+To run this workflow in LangGraph Studio, we create a configuration file called LangGraph.json inside the debugging folder. The file specifies dependencies, graphs, and environment variables:
+
+{
+  "dependencies": ["."],
+  "graphs": [
+    {
+      "name": "openai_agent",
+      "file": "openai_agent.py",
+      "variable": "agent"
+    }
+  ],
+  "env": "../.env"
+}
+
+
+This ensures that the Studio can locate the agent, the Python file, and required environment variables. Additionally, we need to install the LangGraph CLI library using a requirements.txt file:
+
+langgraph-cli==<version>
+
+
+Then install the dependencies:
+
+pip install -r requirements.txt
+
+
+To deploy and debug the workflow, navigate to the debugging folder in your terminal:
+
+cd debugging
+langgraph dev
+
+
+This command uses the configuration in LangGraph.json to start the agent locally and deploy it to LangSmith Cloud. Once executed, the LangGraph Studio opens, showing the workflow with nodes start, agent, and end. You can submit human messages, system messages, or tool inputs and see the response flow through each node.
+
+For example, if we submit a message like "Hello, how are you?", the agent processes it and returns a response: "Hello, I am just a computer program so I don't have feelings, but I'm here to help you." You can modify the input on the fly, and even fork the workflow to change inputs during runtime.
+
+Next, we can create a more complex workflow that includes a tool node. We define a new function make_alternate_graph to include the tool interaction:
+
+def make_alternate_graph():
+    graph_workflow = StateGraph(State)
+    def call_model(state):
+        return state.messages
+    tool_node = ToolNode("add", params=["a", "b"])
+    graph_workflow.add_node("agent", call_model)
+    graph_workflow.add_node("tool", tool_node)
+    graph_workflow.add_edge("start", "agent")
+    graph_workflow.add_edge("agent", "tool")
+    graph_workflow.add_edge("tool", "agent")
+    graph_workflow.add_edge("agent", "end") 
+    agent = graph_workflow.compile()
+    return agent
+
+
+This workflow demonstrates tool calls: the agent sends a request to the tool, the tool performs the computation (e.g., addition), and the result is sent back to the agent. For instance, asking "What is 10 + 10?" will execute through the tool node, returning 20. You can edit inputs during runtime to see how outputs change, making it highly interactive.
+
+Finally, you can configure interrupts at various points—before the tool, after the tool, or even before agent execution—to handle conditional pauses or runtime checks. This capability allows you to debug and optimize complex LangGraph workflows step by step.
+
+In conclusion, LangGraph Studio provides a powerful interface to debug, visualize, and edit workflows in real-time. By following this setup—creating openai_agent.py, LangGraph.json, installing dependencies, and using langgraph dev—you can debug simple chatbots as well as more complex tool-integrated workflows efficiently.
+
+# **XII) Different Workflows In LangGraph**
+
+**A) Prompt Chaining**
+
+We are going to continue our discussion on the LangGraph series. In this video, and in the upcoming series, we will explore different types of workflows. Workflows are extremely important because when implementing real-world use cases, designing the workflow properly allows you to follow specific patterns to solve complex problems effectively. As we progress, you will see multiple workflow designs.
+
+In this specific video, we will focus on prompt chaining. First, we’ll define what prompt chaining is, then visualize it using a diagram from the LangGraph documentation, and finally implement a real-world use case to demonstrate it.
+
+Definition of Prompt Chaining:
+
+Prompt chaining is a technique in natural language processing (NLP) where multiple prompts are sequenced together to guide a model through a complex task or reasoning process. Instead of relying on a single prompt to achieve a desired outcome, prompt chaining breaks the task into smaller, manageable steps, with each step building on the previous one. This approach helps improve accuracy, coherence, and control when working with large language models.
+
+In simpler terms, prompt chaining divides a complex task into smaller subtasks, which are solved sequentially, step by step.
+
+Let’s consider a diagram to understand the workflow. In this diagram:
+
+We start with an input.
+
+We make an LM call (Large Language Model call).
+
+We can include logic or conditions between tasks. If the condition is satisfied, the next prompt or subtask is executed.
+
+Tasks continue sequentially until the workflow is complete.
+
+For instance, if solving a problem using prompt chaining, a bigger task can be divided into three subtasks:
+
+Task A → execute first subtask.
+
+Task B → execute if condition from Task A is satisfied.
+
+Task C → execute as the final step.
+
+Multiple conditions can be added at any stage, ensuring that the model progresses through the workflow correctly.
+
+To implement this in code, let’s consider a simple real-world use case: generating a story using prompt chaining. Our workflow will have three steps: generate, improve, and polish the story. Additionally, we will apply a conditional check after generating the story. If the story passes the condition, it proceeds to improvement and polishing. If it fails, it loops back to generate a new story.
+
+Here’s a sample Python implementation of the workflow:
+
+from langgraph import StateGraph, AddMessages
+from typing import Annotated
+
+# Define the state class
+class State(dict):
+    messages: Annotated[list, AddMessages()]
+
+# Define the functions for each step
+def generate_story(state):
+    story = "Once upon a time, in a small village..."  # Example story generation
+    state.messages.append({"step": "generate", "story": story})
+    return state
+
+def improve_story(state):
+    story = state.messages[-1]["story"] + " The villagers faced a challenge."  # Improving story
+    state.messages.append({"step": "improve", "story": story})
+    return state
+
+def polish_story(state):
+    story = state.messages[-1]["story"] + " And they lived happily ever after."  # Polishing
+    state.messages.append({"step": "polish", "story": story})
+    return state
+
+# Condition function to decide whether to continue
+def check_condition(state):
+    last_story = state.messages[-1]["story"]
+    if "challenge" in last_story:
+        return True
+    return False
+
+# Define the workflow
+def make_story_workflow():
+    graph = StateGraph(State)
+    # Add nodes
+    graph.add_node("generate", generate_story)
+    graph.add_node("improve", improve_story)
+    graph.add_node("polish", polish_story)
+    # Add edges with conditions
+    graph.add_edge("generate", "improve", condition=check_condition)
+    graph.add_edge("improve", "polish")
+    # Compile workflow
+    agent = graph.compile()
+    return agent
+
+# Initialize workflow
+agent = make_story_workflow()
+
+
+In this example:
+
+The generate_story node creates the initial story.
+
+The improve_story node enhances the story with additional content.
+
+The polish_story node finalizes the story for output.
+
+The check_condition function acts as a decision point, ensuring that the story meets a certain quality before moving to the next step.
+
+This workflow demonstrates the core idea of prompt chaining: breaking a complex task into smaller, sequentially executed steps with conditional logic in between.
+
+By using this approach, we can handle complex tasks in a structured manner, making it easier to debug, modify, and improve outputs in large-scale NLP workflows.
+
+In summary, prompt chaining is a powerful technique to enhance model reasoning, maintain control over tasks, and ensure a coherent workflow. For this example, we created a story generator workflow with three stages and conditional logic to ensure quality outputs.
+
+I hope you have understood the concept of prompt chaining. In the next video, we will explore more advanced workflow patterns and implement more complex use cases.
+
+Thank you, and see you in the next video.
+
+**B) Prompt Chaining Implementation With Langgraph**
+
+So guys, we are going to continue our discussion on prompt chaining and implement a specific use case in this video. The notebook we will be working on is called prompt_chaining.ipynb, located inside the fourth folder, workflows. Prompt chaining, as defined in the notebook, is a technique in natural language processing where multiple prompts are sequenced together to guide a model through a complex task. You can refer to the notebook for the exact definition whenever needed.
+
+To understand how prompt chaining works, we first define a task and then break it down into smaller subtasks. For instance, if the main task is to generate a detailed report, we might split it into gather_data, analyze_data, and write_summary. Each subtask corresponds to a node in the workflow graph. Next, we define edges between nodes and include conditional logic if needed. Finally, we execute the graph. The key advantage is that prompt chaining allows us to iterate if a particular subtask fails a condition.
+
+For our use case, we want to generate a story with three nodes: Generate, Improve, and Polish. After generating the story, we check a condition. If it passes, we move to improvement and polishing; if it fails, it loops back to generate a new story. To start, we need to load the language model (LM). This can be done using the following code:
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Example using a freely available LM (ChatGrok) or OpenAI API key
+# lm = ChatGrokModel("model_name_here")
+# lm = OpenAIModel(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Load your model
+lm = YourLMModel("model_name_here")  # e.g., "mistral-2-5B"
+
+
+Once the LM is ready, we define the state class to store the inputs and outputs of each node:
+
+from typing import Annotated
+from landgraf.graph import StateGraph
+from IPython.display import display, Image
+
+class State(dict):
+    topic: str = ""
+    story: str = ""
+    improved_story: str = ""
+    final_story: str = ""
+
+
+Here, topic is the input given by the user. story stores the output from the Generate node, improved_story stores the output from the Improve node, and final_story stores the output from the Polish node. This allows the workflow to maintain context across multiple prompts.
+
+Next, we define our nodes. The Generate Story node takes the topic and produces an initial story:
+
+def generate_story(state: State):
+    message = lm.invoke(f"Write a one sentence story premise about: {state.topic}")
+    state.story = message.content
+    return state
+
+
+We then define a conditional node to check if the story contains a question mark ? or exclamation !. If it does, the node returns "fail", otherwise "pass":
+
+def check_conflict(state: State):
+    if "?" in state.story or "!" in state.story:
+        return "fail"
+    return "pass"
+
+
+The Improve Story node enhances the generated story with more details:
+
+def improve_story(state: State):
+    message = lm.invoke(f"Enhance the story with vivid details: {state.story}")
+    state.improved_story = message.content
+    return state
+
+
+Finally, the Polish Story node applies a final twist or refinement to the improved story:
+
+def polish_story(state: State):
+    message = lm.invoke(f"Add an unexpected twist to the story: {state.improved_story}")
+    state.final_story = message.content
+    return state
+
+
+With nodes defined, we can build the workflow graph. We add nodes to the graph, define edges, and include the conditional logic from the check node:
+
+graph = StateGraph(state=State())
+
+# Add nodes
+graph.add_node("generate", generate_story)
+graph.add_node("improve", improve_story)
+graph.add_node("polish", polish_story)
+
+# Add edges
+graph.add_edge("start", "generate")
+graph.add_conditional_edges("generate", check_conflict, pass_node="improve", fail_node="generate")
+graph.add_edge("improve", "polish")
+graph.add_edge("polish", "end")
+
+
+We compile and display the graph to verify its structure:
+
+graph.compile()
+display(graph)
+
+
+Now, we can run the graph by providing an initial topic. For example, if the topic is "Generic AI systems":
+
+state = State()
+state.topic = "Generic AI systems"
+
+result = graph.invoke(state)
+print(result)
+
+
+The output will include the topic, generated story, improved story, and the final polished story. For example:
+
+Generated story: "In a future where generic AI systems possess autonomy beyond human comprehension..."
+
+Improved story: "In a future where generic AI systems possess autonomy beyond human comprehension, humans struggle to adapt..."
+
+Polished story: "In a future where generic AI systems possess autonomy beyond human comprehension, humans struggle to adapt, and an unexpected AI rebellion unfolds..."
+
+By dividing the task into smaller subtasks and using conditional logic, prompt chaining ensures better context management, modularity, and debugging ease. Each node focuses on a single aspect of the task, reducing the risk of losing context, making it easier to reuse and rearrange nodes, and allowing complex reasoning in a step-by-step manner.
+
+This is a complete example of prompt chaining using Landgraf, from loading the model, creating state, defining nodes, building the graph, and finally executing it to generate, improve, and polish a story. This workflow can be applied to any task requiring multiple steps and logical checks, making it highly versatile and powerful.
+
+**C) Parallelization**
+
+Hello guys! Today, we are going to continue our discussion on different types of workflows. In this video, we will focus on parallelization. The main goal is to understand why parallelization is used and how it can help when building workflows where tasks do not depend on each other’s output. We will go through the concept, implementation, and a practical example so that the concept becomes crystal clear.
+
+In a standard workflow, nodes usually execute sequentially—one after the other, following the edges defined in the graph. However, if the output of a task is independent of previous tasks, you can execute those nodes in parallel. Parallelization allows tasks to run concurrently, and their outputs can then be aggregated into a downstream node. Conceptually, this is done by connecting multiple independent nodes to a common start node, then combining their outputs in an aggregator node before reaching the end node.
+
+For our example, we are going to generate a short story. The story requires different characters, premises, and settings, all of which can be generated independently. Once all these independent nodes finish execution, their outputs are combined to form a story introduction. This is a perfect scenario for parallelization because none of these nodes depends on the output of the others.
+
+First, we need to load our LLM. You can use ChatGPT, OpenAI API, or ChatGrok. Here’s how we load the model:
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Example using ChatGrok or OpenAI API
+# lm = ChatGrokModel("model_name_here")
+# lm = OpenAIModel(api_key=os.getenv("OPENAI_API_KEY"))
+
+lm = YourLMModel("model_name_here")
+
+
+Next, we define our state class which will store the topic, characters, settings, premises, and story introduction:
+
+from typing import Annotated
+from landgraf.graph import StateGraph
+
+class State(dict):
+    topic: str = ""
+    characters: str = ""
+    settings: str = ""
+    premises: str = ""
+    story_intro: str = ""
+
+
+Now, we define the nodes that will run in parallel. The first node generates characters based on the topic:
+
+def generate_characters(state: State):
+    message = lm.invoke(f"Create two character names and brief traits for a story about {state.topic}")
+    state.characters = message.content
+    return state
+
+
+Similarly, we generate settings:
+
+def generate_settings(state: State):
+    message = lm.invoke(f"Describe a vivid setting for a story about {state.topic}")
+    state.settings = message.content
+    return state
+
+
+And premises:
+
+def generate_premises(state: State):
+    message = lm.invoke(f"Write a one-sentence plot premise for a story about {state.topic}")
+    state.premises = message.content
+    return state
+
+
+Since these three nodes are independent, they can be executed concurrently. Once they complete, we use an aggregator node to combine their outputs into a story introduction:
+
+def combine_elements(state: State):
+    message = lm.invoke(
+        f"Write a short story introduction using these elements:\n"
+        f"Characters: {state.characters}\n"
+        f"Settings: {state.settings}\n"
+        f"Premises: {state.premises}"
+    )
+    state.story_intro = message.content
+    return state
+
+
+With the nodes defined, we can build the parallel workflow graph:
+
+graph = StateGraph(state=State())
+
+# Add nodes
+graph.add_node("generate_characters", generate_characters)
+graph.add_node("generate_settings", generate_settings)
+graph.add_node("generate_premises", generate_premises)
+graph.add_node("combine", combine_elements)
+
+# Add edges for parallel execution
+graph.add_edge("start", "generate_characters")
+graph.add_edge("start", "generate_settings")
+graph.add_edge("start", "generate_premises")
+
+# Combine outputs
+graph.add_edge("generate_characters", "combine")
+graph.add_edge("generate_settings", "combine")
+graph.add_edge("generate_premises", "combine")
+graph.add_edge("combine", "end")
+
+
+After building the graph, we compile and visualize it:
+
+graph.compile()
+display(graph)
+
+
+Finally, we can invoke the graph with a topic. For example, let’s generate a story about "Time Travel":
+
+state = State()
+state.topic = "Time Travel"
+
+result = graph.invoke(state)
+print(result.story_intro)
+
+
+Here, all three nodes (generate_characters, generate_settings, and generate_premises) run concurrently, and their outputs are aggregated by the combine_elements node. The resulting story_intro gives a short story introduction based on all the parallel outputs.
+
+The key benefits of parallelization in workflows include:
+
+Speed: Reduces total execution time by running tasks concurrently.
+
+Scalability: Efficiently handles large workflows and keeps the graph clean.
+
+Reusability: Independent nodes can be reused or rearranged in different workflows.
+
+In summary, parallelization is highly useful when tasks do not depend on each other’s outputs. By executing nodes concurrently and combining results, you can build efficient and modular workflows. This workflow is a practical example of generating a story where multiple tasks are independent but contribute to a single aggregated output.
+
+**D) Routing**
+
+Hello guys! Today we are going to continue our discussion on different types of workflows, and in this video, we are going to focus on routing. Routing is a technique that allows a workflow to conditionally determine which node to execute next based on the current state or the output of a node. You may have already encountered routing in previous examples, such as when we added conditional edges. But in this session, we’ll make a dedicated discussion and implementation. We will also integrate Pydantic classes to ensure that our language model (LM) provides structured outputs, which is crucial for routing decisions.
+
+In simple terms, routing allows us to "route" the flow of execution to different nodes depending on certain conditions. For example, if the LM output indicates that the user wants a story, a joke, or a poem, we can route the input to the corresponding node. Conceptually, a router node evaluates the input and decides the next node in the workflow. This can be visualized as a decision point in a flowchart, where the LM evaluates the input and directs it down the appropriate path. The paths are independent, and whichever route is taken will finally converge to the end of the workflow.
+
+Before we implement routing, we need to define structured output using Pydantic. This ensures that the LM output is constrained to specific values and avoids errors. First, we import the necessary libraries: "from typing_extensions import Literal" and "from pydantic import BaseModel". Then, we define a Pydantic class called Route which restricts LM outputs to "poem", "story", or "joke":
+
+from typing_extensions import Literal
+from pydantic import BaseModel, Field
+
+class Route(BaseModel):
+    step: Literal["poem", "story", "joke"] = Field(..., description="The next step in the routing process")
+
+
+This ensures that the LM will only return one of these three values, and any deviation will raise an error. Next, we integrate this structured output with our LM to create a router LM:
+
+from langchain.schema import HumanMessage, SystemMessage
+
+router_lm = YourLMModel.structured_output(Route)
+
+
+Here, router_lm will always provide outputs in the structure defined by the Route class.
+
+Next, we define a state class to store the workflow state. This class will keep track of the input, the LM routing decision, and the final output. For this, we use a dictionary-like type:
+
+from typing_extensions import TypeDict
+
+class State(TypeDict):
+    input: str
+    decision: str
+    output: str
+
+
+This State class will be used to pass information between nodes in our workflow.
+
+Now let’s define the three LM nodes that represent the different outputs:
+
+def lm_call_one(state: State):
+    # Handles story generation
+    state.output = lm.invoke(f"Write a story about {state.input}").content
+    return state
+
+def lm_call_two(state: State):
+    # Handles joke generation
+    print("LM call two is called")
+    state.output = lm.invoke(f"Write a joke about {state.input}").content
+    return state
+
+def lm_call_three(state: State):
+    # Handles poem generation
+    state.output = lm.invoke(f"Write a poem about {state.input}").content
+    return state
+
+
+Each of these nodes takes the same input and generates a different type of output, but they are only invoked based on the LM router’s decision.
+
+Next, we define the router node itself, which determines which path to follow:
+
+def lm_router(state: State):
+    decision = router_lm.invoke(
+        system_message=SystemMessage(content="Route the input to 'story', 'joke', or 'poem' based on user request."),
+        human_message=HumanMessage(content=state.input)
+    )
+    state.decision = decision.step
+    return state
+
+
+Here, the router evaluates the input and assigns a value to state.decision, which can be "story", "joke", or "poem". Based on this decision, we define a conditional function to determine which LM node to invoke:
+
+def route_decision(state: State):
+    if state.decision == "story":
+        return lm_call_one
+    elif state.decision == "joke":
+        return lm_call_two
+    elif state.decision == "poem":
+        return lm_call_three
+
+
+This function connects the router’s decision to the appropriate node in the workflow.
+
+Finally, we build the routing workflow using a state graph:
+
+from landgraf.graph import StateGraph
+
+router_workflow = StateGraph(state=State())
+
+# Add nodes
+router_workflow.add_node("router", lm_router)
+router_workflow.add_node("story_node", lm_call_one)
+router_workflow.add_node("joke_node", lm_call_two)
+router_workflow.add_node("poem_node", lm_call_three)
+
+# Add edges
+router_workflow.add_edge("start", "router")
+router_workflow.add_conditional_edge("router", route_decision)
+router_workflow.add_edge("story_node", "end")
+router_workflow.add_edge("joke_node", "end")
+router_workflow.add_edge("poem_node", "end")
+
+# Compile and display
+router_workflow.compile()
+display(router_workflow)
+
+
+Now we can invoke the workflow with user input:
+
+state = State(input="Write me a joke about Agentic AI systems")
+output_state = router_workflow.invoke(state)
+print(output_state.output)
+
+
+If the user asks for a joke, the router evaluates the input and correctly routes it to lm_call_two. The output might look like:
+
+"Why did I refuse to play hide and seek? Because it could not stand the thought of being out of control."
+
+In summary, routing allows workflows to dynamically determine which node to execute next based on conditions evaluated at runtime. Using Pydantic ensures structured LM outputs, preventing errors. The workflow can handle multiple routing paths, like "story", "joke", or "poem", and is fully extendable for more complex use cases.
+
+Routing, combined with structured outputs, makes your workflows dynamic, flexible, and robust. The sky is the limit—you can create more complex routing logic with LM-driven decisions to automate a wide variety of tasks.
+
+**E) Orchestrator-Worker**
+
+Hello guys! Today we are going to continue our discussion on workflows, and in this session, we are going to focus on a new workflow called the Orchestrator-Worker Workflow. This workflow is particularly important because it allows a central LM (or orchestrator) to dynamically break down tasks, assign them to multiple worker LMs, and finally synthesize their results. It is ideal for complex tasks where subtasks cannot be predicted in advance, such as generating multi-section reports or coding tasks where the number of files and type of edits vary.
+
+The Orchestrator-Worker workflow works in three major steps: (1) Task breakdown, (2) Task delegation to workers, and (3) Synthesizing results. Unlike simple parallelization, this workflow is flexible, because the orchestrator dynamically decides which tasks need to be executed, and assigns them to workers. The workers then work in parallel, independently completing their subtasks, and the synthesizer combines their outputs into a final consolidated result. Conceptually, the orchestrator is like a manager, and the worker LMs are like employees executing assigned tasks.
+
+Let’s take an example. Suppose we want to generate a detailed report on “Agentic AI Systems”. This report can have multiple sections: "Introduction", "History", "Current Trends 2025", and more. Instead of writing these sequentially, the orchestrator dynamically creates worker LMs and assigns each section to a different worker. Worker 1 writes the introduction, Worker 2 handles the history, and Worker 3 covers current trends. Once all sections are completed, the orchestrator synthesizes the results into a single report. This ensures parallel execution and structured aggregation of output.
+
+Now, let’s see how we can implement this using Python. First, we define the worker nodes. Each worker is responsible for handling a specific section of the report:
+
+def worker_introduction(task_input):
+    # LM generates the Introduction section
+    return lm.invoke(f"Write an introduction about {task_input}").content
+
+def worker_history(task_input):
+    # LM generates the History section
+    return lm.invoke(f"Write the history of {task_input}").content
+
+def worker_current_trends(task_input):
+    # LM generates the Current Trends section
+    return lm.invoke(f"Write about current trends of {task_input} in 2025").content
+
+
+Next, we define the orchestrator, which is responsible for dynamically breaking down the task and assigning it to workers. The orchestrator will also collect the outputs from all workers:
+
+def orchestrator(task_input):
+    # Define sections dynamically
+    tasks = {
+        "Introduction": worker_introduction,
+        "History": worker_history,
+        "Current Trends": worker_current_trends
+    }
+    # Assign tasks to workers and execute in parallel
+    from concurrent.futures import ThreadPoolExecutor
+    results = {}
+    with ThreadPoolExecutor() as executor:
+        future_to_section = {executor.submit(worker, task_input): section for section, worker in tasks.items()}
+        for future in future_to_section:
+            section = future_to_section[future]
+            results[section] = future.result()
+    # Return synthesized report
+    return synthesize_report(results)
+
+
+Here, the orchestrator uses ThreadPoolExecutor to run worker nodes in parallel, ensuring faster execution. Each worker returns its section of the report, and the orchestrator collects these results in a dictionary.
+
+Finally, we define a synthesizer to combine the outputs into a coherent report:
+
+def synthesize_report(results):
+    report = ""
+    for section, content in results.items():
+        report += f"### {section}\n{content}\n\n"
+    return report
+
+
+Now, we can invoke the full Orchestrator-Worker workflow with user input:
+
+task_input = "Agentic AI Systems"
+final_report = orchestrator(task_input)
+print(final_report)
+
+
+In this example, the orchestrator dynamically delegates subtasks to multiple worker LMs, which execute independently and in parallel. Once all workers complete their tasks, the synthesizer combines their outputs to produce the final report.
+
+In summary, the Orchestrator-Worker Workflow is extremely powerful for complex, unpredictable tasks. It allows dynamic task breakdown, parallel execution by worker LMs, and result aggregation. This workflow is highly flexible and can be adapted for report generation, coding automation, research summarization, and other multi-step processes where subtasks are independent but need to be combined into a final coherent output.
+
+**F) Orchestrator Worker Implementation**
+
+Hello guys! In this session, we are going to implement the Orchestrator-Worker Workflow that we discussed in the previous video. We will use Python and LangGraph to dynamically create workers, perform LM calls in parallel, and generate a structured report with multiple sections.
+
+Step 1: Setting Up the Environment
+
+First, we need to import all necessary libraries, including Pydantic for structured outputs, typing helpers, and Landgraf’s send API to dynamically create workers:
+
+from pydantic import BaseModel, Field
+from typing import List
+from landgraf.constants import send
+from operator import add  # for managing shared state
+
+Step 2: Define the Report Schema
+
+We define the schema of our report using Pydantic. Each section has a name (title) and description (detailed content):
+
+class Section(BaseModel):
+    name: str = Field(..., description="Title of the section of the report")
+    description: str = Field(..., description="Brief overview or detailed information for the section")
+
+class Report(BaseModel):
+    sections: List[Section] = Field(..., description="List of sections in the report")
+
+
+The LM will return output according to this schema, making it easy to structure the report programmatically.
+
+Step 3: Create the Planner
+
+The orchestrator acts as a manager to create a report plan. We use an LM call to generate the outline of the report (sections with names and placeholders for descriptions):
+
+planner = lm.with_structured_output(Report)
+
+def create_report_plan(topic: str):
+    return planner.invoke(topic)
+
+
+The topic is the main subject of the report, and the output is a list of sections ready to be assigned to workers.
+
+Step 4: Define the LM Call for Workers
+
+Each worker will generate the content for a specific section. The LM call for a worker looks like this:
+
+def lm_call(section: Section):
+    response = lm.invoke(
+        system_message="Write a report section following the provided name and description. Use markdown formatting. Include no preamble.",
+        human_message=f"Section Name: {section.name}"
+    )
+    return response.content
+
+
+This function takes a section as input and returns the generated content for that section.
+
+Step 5: Create Worker State
+
+Since each worker can maintain its own state, we define a worker state class to keep track of the completed sections:
+
+class WorkerState(BaseModel):
+    section: Section
+    completed_sections: List[str] = []
+
+
+This ensures each worker writes to a shared state without conflicts.
+
+Step 6: Assign Workers Dynamically Using Send API
+
+The orchestrator dynamically creates workers for each section using the send API. This allows parallel execution of LM calls:
+
+def assign_workers(state):
+    return send(
+        lm_call,
+        inputs=[section for section in state.sections],  # one worker per section
+        state=state.completed_sections,  # shared state
+        operator=add  # append results to shared state
+    )
+
+
+Here, each worker independently generates its section content in parallel, and all outputs are stored in completed_sections.
+
+Step 7: Synthesizer
+
+Once all workers complete their tasks, the synthesizer combines all sections into a final report:
+
+def synthesizer(completed_sections: List[str]):
+    final_report = "\n\n".join(completed_sections)
+    return final_report
+
+Step 8: Build the Workflow
+
+We integrate all components into a state graph workflow:
+
+from landgraf.workflow import Workflow, StateGraph
+
+workflow = Workflow()
+state_graph = StateGraph()
+
+state_graph.add_node("orchestrator", create_report_plan)
+state_graph.add_node("assign_workers", assign_workers)
+state_graph.add_node("synthesizer", synthesizer)
+
+state_graph.add_edge("orchestrator", "assign_workers")
+state_graph.add_edge("assign_workers", "synthesizer")
+
+
+This structure ensures the orchestrator generates the plan, workers execute in parallel, and the synthesizer merges results.
+
+Step 9: Run the Workflow
+
+Finally, we invoke the workflow with a topic:
+
+topic = "Introduction to RAG Agents"
+final_report = workflow.invoke(topic)
+
+from IPython.display import Markdown, display
+display(Markdown(final_report))
+
+
+The orchestrator generates a report outline.
+
+Workers dynamically generate content for each section in parallel.
+
+The synthesizer combines all sections to produce the final report.
+
+This workflow is extremely efficient for blog generation, reports, or any multi-section content, because all sections are created simultaneously, drastically reducing total execution time.
+
+Summary
+
+1. Planner: Orchestrator generates a structured outline.
+
+2. Workers: Dynamically created to handle each section in parallel.
+
+3. LM Call: Generates section content.
+
+4. Shared State: Workers store results.
+
+5. Synthesizer: Combines all sections into a final report.
+
+By following this pattern, you can scale content generation efficiently and manage complex tasks dynamically with LMs.
+
+**G) Evaluator-optimizer**
+
+Hello guys! In this session, we are going to implement the Evaluator-Optimizer Workflow, which is another type of workflow that helps in iterative refinement of AI-generated content.
+
+Step 1: Understanding the Workflow
+
+Generator LM: Produces content (e.g., a joke, story, or text).
+
+Evaluator LM: Checks the content against criteria (e.g., quality, humor, correctness).
+
+Looping mechanism: If the content fails evaluation, feedback is sent back to the generator to improve the output.
+
+Accepted output: Once the content passes evaluation, it proceeds to the next step or final output.
+
+Use Case: Creating a joke about a topic, evaluating whether it is funny, and iteratively improving it until it meets the criteria.
+
+Step 2: Define the State
+
+We define a state class to track the topic, the joke generated, and evaluation feedback:
+
+from pydantic import BaseModel
+from typing import Literal
+
+class State(BaseModel):
+    topic: str
+    joke: str = ""
+    funny: bool = False
+    feedback: str = ""
+
+
+topic: The input subject for joke generation.
+
+joke: Content generated by the generator LM.
+
+funny: Boolean indicating if the joke is approved.
+
+feedback: Feedback from the evaluator LM to improve the joke if rejected.
+
+Step 3: Define the Feedback Structure
+
+The feedback class structures the evaluator’s output:
+
+class Feedback(BaseModel):
+    grade: Literal["funny", "not funny"]
+    feedback: str = Field(..., description="If not funny, provide feedback for improvement")
+
+
+grade: Either "funny" or "not funny".
+
+feedback: Text describing why the joke was rejected and how to improve it.
+
+We then attach this structured output to our LM:
+
+lm.with_structured_output(Feedback)
+
+Step 4: Define Nodes
+Generator Node
+
+Generates a joke, optionally taking evaluator feedback into account:
+
+def generator_node(state: State):
+    if state.feedback:
+        prompt = f"Write a joke about {state.topic}, considering the feedback: {state.feedback}"
+    else:
+        prompt = f"Write a joke about {state.topic}"
+    response = lm.invoke(prompt)
+    state.joke = response.content
+    return state
+
+Evaluator Node
+
+Evaluates the joke and provides feedback:
+
+def evaluator_node(state: State):
+    eval_response = evaluator.invoke(state.joke)
+    state.funny = eval_response.grade == "funny"
+    state.feedback = eval_response.feedback
+    return state
+
+Step 5: Conditional Routing
+
+We define a routing function to decide the next step:
+
+def route_joke(state: State):
+    if state.funny:
+        return "accepted"
+    else:
+        return "rejected_feedback"
+
+
+If funny = True, the joke is accepted.
+
+If funny = False, it loops back to the generator with feedback.
+
+Step 6: Build the Workflow
+
+We create a state graph and connect nodes:
+
+from landgraf.workflow import Workflow, StateGraph
+
+workflow = Workflow()
+state_graph = StateGraph()
+
+state_graph.add_node("generator", generator_node)
+state_graph.add_node("evaluator", evaluator_node)
+
+# Routing logic
+state_graph.add_edge("generator", "evaluator")
+state_graph.add_conditional_edge("evaluator", route_joke, accepted="end", rejected_feedback="generator")
+
+
+Generator → Evaluator → Conditional routing → either end or back to generator.
+
+Step 7: Execute the Workflow
+
+Finally, we invoke the workflow with a topic:
+
+topic = "Agentic AI System"
+state = State(topic=topic)
+
+final_state = workflow.invoke(state)
+print(final_state.joke)
+
+
+The generator creates the initial joke.
+
+The evaluator checks it and either approves it or sends feedback to regenerate.
+
+This loop continues until the joke is deemed "funny".
+
+Summary:
+
+1. Generator: Creates content based on a topic and optionally feedback.
+
+2. Evaluator: Grades content and provides structured feedback.
+
+3. Loop: Rejected content is sent back to the generator for improvement.
+
+4. Accepted output: Content passes evaluation and proceeds to final output.
+
+This workflow is ideal for iterative refinement, human-in-the-loop setups, and quality-controlled content generation.
 
 
