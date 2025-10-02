@@ -104,6 +104,28 @@
 
 **G) Adaptive RAG Implementation**
 
+**XV) End To End Agentic AI Projects With LangGraph**
+
+**A) Introduction And Overview**
+
+**B) Project Set Up With VS Code**
+
+**C) Setting up The Github Repository**
+
+**D) Setting Up The Project Structure**
+
+**E) Designing The Front End Using streamlit**
+
+**F)  Implementing The LLM Module In Graph Builder**
+
+**G) Implementing The Graph Builder Module**
+
+**H) Implementing The Node Implementation**
+
+**I) Integrating the Entire Pipeline With Front End**
+
+**J) Testing The End To End Agentic Application**
+
 **XIX) Model Context Protocol**
 
 **AA) Demo of MCP with Claude Desktop**
@@ -2871,3 +2893,275 @@ Query: “What is agent memory?” → present in retriever → grade documents 
 This demonstrates the Adaptive RAG workflow in practice, combining query analysis, retrieval, self-reflection, and generation in a modular, node-based system. Each node uses the LLM in some way, ensuring both flexibility and accuracy.
 
 I hope this example helps you understand how to implement Adaptive RAG end-to-end. In the next video, we will explore additional optimizations and real-world deployments of this system. Thank you, and take care.
+
+# **XV) End To End Agentic AI Projects With LangGraph**
+
+**A) Introduction And Overview**
+
+Hello guys. In this video, we are going to continue our discussion with respect to LangChain. Over the previous videos, we have covered six main sections—from LangChain basics, where we learned how to use Pydantic, create chat chains, and build chatbots with multiple tools, to React agents, workflows, and human-in-the-loop integrations. We also explored different types of RAG architectures. Most of the implementations we saw were done in Jupyter Notebooks, which is great for learning and experimentation.
+
+Now, the next step is to understand how to develop an end-to-end project. In this module, we will build a complete industry-standard project, focusing on modular coding, deployment, and creating scalable solutions. We will write each line of code step by step to demonstrate how to translate the concepts we have learned into a production-ready system. This includes creating state graphs, structuring code into classes, and ensuring everything is modular for maintainability.
+
+The product we are going to develop is hosted on Hugging Face, and it includes three major functionalities. First, a basic chatbot; second, a chatbot with tools; and third, an AI news assistant. Each of these applications will be developed as a separate module, which allows us to maintain clean, scalable code.
+
+To show how the project works, let me demonstrate the basic chatbot workflow. Here, we are using Grok LLM, powered by Llama 3, with an API key configured:
+
+"from langchain.chat_models import ChatOpenAI
+llm = ChatOpenAI(model_name='llama-3', api_key=OPENAI_API_KEY, temperature=0.7)
+
+response = llm.invoke('Hi, my name is Chris.')
+print(response)"
+
+When I type, “Hi, my name is Chris”, the chatbot responds: “Hey Chris! Nice to meet you. How are you doing today?” This demonstrates the stateful interaction that allows the bot to maintain context.
+
+Next, we have the chatbot with tools, which can perform specific tasks like retrieving Python code, accessing web information, or performing calculations. For example, if I ask: “Provide me Python code to play Snake game”, the system retrieves the relevant response using either a retriever module or web search, and then generates a solution using the LLM:
+
+"from langchain.chains import LLMChain
+from langchain.prompts import ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are a helpful assistant.'),
+ ('human', '{question}')
+])
+
+snake_chain = LLMChain(llm=llm, prompt=prompt)
+response = snake_chain.run({'question': 'Provide Python code to play Snake game'})
+print(response)"
+
+What makes this project particularly exciting is that it reflects real-world industry standards. In companies, projects are implemented modularly, using stateful graphs, class-based structures, and end-to-end deployment pipelines. Our system also uses Streamlit for the frontend, allowing users to interact with the chatbot seamlessly. Future extensions will include FastAPI-based endpoints, enabling Postman testing and integration with other services.
+
+We will structure this project as follows:
+
+Modular Nodes: Each functionality (basic chatbot, chatbot with tools, AI news assistant) is implemented as a separate module or class.
+
+State Graph: Interactions flow through a stateful graph, tracking queries, responses, and context.
+
+Deployment: The final application will be hosted on Hugging Face or similar platforms.
+
+Extensibility: Additional use cases can be added without disrupting the core architecture.
+
+In the next video, we will set up VSCode, configure our environment, and begin writing modular code for this project. We will ensure that every step is clear so that anyone can understand how to implement a production-ready LangChain project from scratch.
+
+This concludes the introduction to our end-to-end project. I hope you are excited to build this, and I will see you in the next video. Thank you, and take care.
+
+**B) Project Set Up With VS Code**
+
+Hello guys. In this video, we are going to continue our discussion regarding our end-to-end LangChain project. As mentioned earlier, we will start by building a basic chatbot, but this time we will focus on modular coding, ensuring that the project is structured in a scalable and maintainable way. As we progress, we will gradually increase the complexity of the projects, moving from a basic chatbot to a chatbot with tools, and finally to an application that can fetch recent AI news. Later, we will extend these applications using FastAPI and other modern frameworks.
+
+Before we start coding, the first step is to create a dedicated project space where all files and modules for this chatbot project will reside. In my case, I have created a folder named genetic_chatbot to organize this project. You can create a folder anywhere on your system according to your preferences. Once the folder is created, we will open it in VS Code to continue with the implementation.
+
+The next step is to set up a virtual environment, which is a best practice for any Python project to isolate dependencies. For this, we will use Conda. The command to create a virtual environment named venv with Python 3.13 is:
+
+"conda create -p venv python=3.13"
+
+After running this command, you will be prompted to confirm the installation of required packages. Type y and press Enter. Once the environment is created, activate it using:
+
+"conda activate venv"
+
+Alternatively, you can use venv or virtualenv directly if you prefer, and we will explore that in future applications.
+
+After activating the environment, we need to create a requirements.txt file, which lists all the libraries required for this project. For this project, the libraries include:
+
+langchain
+
+langgraph
+
+langchain-community
+
+langchain-core
+
+langchain-grok (open-source LLM)
+
+langchain-openai (optional, if needed)
+
+faiss-cpu (for vector search)
+
+streamlit
+
+Python
+
+tabulate (for web search integration)
+
+Once the requirements.txt file is ready, install all dependencies with the command:
+
+"pip install -r requirements.txt"
+
+While the installation is in progress, we also need to set up GitHub to manage our project versions and enable collaboration. We will create a .gitignore file to exclude unnecessary files and folders, such as the venv environment, from being committed:
+
+"venv/"
+
+Additionally, create a README.md file to provide basic information about the project. For example, the README can contain:
+
+"End-to-end project: Agentic AI Chatbot"
+
+This ensures that anyone looking at the repository understands the purpose of the project. Once the virtual environment and libraries are installed, we can move on to GitHub setup. We will create a new repository, initialize it locally, and commit all the project files, excluding the virtual environment, to maintain a clean repository.
+
+The reason for committing the code to GitHub is to prepare for deployment. At the end of the project, we will demonstrate continuous integration and continuous deployment (CI/CD) pipelines to deploy the chatbot seamlessly.
+
+In the next video, we will continue with the GitHub repository setup, initialize it, and commit all the code from this project location. Once this is done, we will be ready to start building the basic modular chatbot using LangChain, which will form the foundation for more advanced applications.
+
+Thank you, and I will see you in the next video.
+
+**C) Setting up The Github Repository**
+
+Hello guys. In this video, we are going to continue our end-to-end project implementation by setting up our GitHub repository. Before we proceed, it is important to have some basic knowledge of Git, as this will be essential for tracking changes, collaborating, and deploying projects efficiently.
+
+First, go to github.com and navigate to your repositories. Click on New Repository, and provide a project name—for this example, we will use AgenticChatbot. You can choose to make the repository public or private; in this case, we will make it private for personal access. After providing the necessary details, click Create Repository. GitHub will then provide commands to connect your local project folder to this repository.
+
+Next, open your command prompt and navigate to your project folder. The first step is to initialize a local Git repository using:
+
+"git init"
+
+This command initializes a Git repository in the current folder, allowing you to track all files. Your .gitignore file, which we previously created, ensures that certain files and folders—like the virtual environment venv—are not tracked. This is important because venv is local to your system and should not be committed.
+
+Once the repository is initialized, you can add files for tracking. For example, to add the README file:
+
+"git add README.md"
+
+Or to add all files:
+
+"git add ."
+
+The A symbol in Git indicates that files have been added to the staging area. Once files are added, you can commit them to the local repository with a message:
+
+"git commit -m 'First commit'"
+
+Git now tracks these files, and any subsequent changes will appear with an M (modified) indicator. For instance, if you make changes to a file, Git will mark it as modified until you add and commit the changes again.
+
+After committing, create a main branch to align with GitHub’s default structure:
+
+"git branch -M main"
+
+Then, link your local repository to the GitHub repository by adding the remote origin:
+
+"git remote add origin <repository-URL>"
+
+Finally, push your changes to GitHub using:
+
+"git push -u origin main"
+
+Once this is done, all your files—including README.md, requirements.txt, and .gitignore—will be visible in your GitHub repository. Your virtual environment is not tracked due to the .gitignore settings, which keeps the repository clean and lightweight.
+
+Whenever you make changes to files, you can repeat the workflow:
+
+Modify files locally.
+
+Add changes to staging: "git add ."
+
+Commit with a descriptive message: "git commit -m 'Second commit'"
+
+Push changes to GitHub: "git push origin main"
+
+The symbols A and M in Git help you track which files are added or modified, making it easy to manage your project. This GitHub setup is fundamental in industry-grade projects, as it allows for version control, collaboration, and deployment. In future steps, we will also integrate CI/CD pipelines to automate deployment.
+
+In the next video, we will start developing our use cases, following a modular structure of programming, and writing code step by step. By the end of this project, you will have a complete end-to-end Agentic AI chatbot ready for deployment.
+
+Thank you, and I will see you in the next video.
+
+**D) Setting Up The Project Structure**
+
+Hello guys. In this video, we are going to continue our end-to-end Agentic AI project with LangGraph. In the previous video, we completed the GitHub repository setup, committed our code, and created a virtual environment. Now, it’s time to set up the project structure, which is one of the most important steps in any end-to-end project.
+
+The structure of your project depends on the type of application you are building. For this Agentic AI project, we will follow a modular architecture that allows us to scale the code, maintain readability, and facilitate deployment. To explain this better, I have drawn a block diagram showing the different components.
+
+For any end-to-end project, there are typically three main components:
+
+Front-end – where the user interacts with the system.
+
+Workflow/Engine – where the core logic is implemented using LangGraph.
+
+Supporting components – which handle nodes, state, models (LMS), and other auxiliary functions.
+
+Looking at the front-end, we have options for selecting the LMS, models, API keys, and use cases. For our project, the main use cases are:
+
+Basic Chatbot
+
+Chatbot with Tools
+
+AI News
+
+The front-end allows users to select any of these use cases, and the workflow should execute accordingly. We will use Streamlit for the front-end development. The front-end also triggers the workflow, which is not like a Jupyter Notebook; here, everything must run as a pipeline.
+
+The workflow consists of nodes and edges, where nodes define individual functionalities and edges define the execution flow, including conditional paths. Each node will be implemented as an independent component, allowing modularity and reusability. The execution starts from the front-end and flows through the workflow until completion.
+
+Now, let’s discuss the project folder structure. First, we will create a main folder called src, which will contain all core functionalities. Inside src, we will have:
+
+LandGraphAgenticAI folder – contains all the main modules and can be treated as a package using __init__.py.
+
+graph/ – handles the workflow graph.
+
+lms/ – contains logic for different LMS models like Grok, LLaMA, or OpenAI.
+
+nodes/ – individual node functionalities of the workflow.
+
+state/ – maintains the global state accessible to all nodes.
+
+tools/ – optional external tools for integration.
+
+ui/ – front-end components (Streamlit interface).
+
+main.py – calls all components step by step within the package.
+
+Outside the package folder, we will have an app.py file, which will be the entry point of the application. This file will trigger the front-end UI and the entire workflow pipeline.
+
+By following this structure, each component remains modular and independent, making it easier to develop, test, and deploy. This approach also aligns with industry standards for large-scale AI projects.
+
+The next step is to commit this structure to GitHub. I have already done a commit for reference, but I encourage you to try it yourself as an assignment. Make sure your __init__.py files are in place so that all folders are treated as packages, enabling easy imports and potential packaging for PyPI in the future.
+
+In the next video, we will start developing each component, beginning with the UI, followed by nodes, workflow graph, LMS integration, and state management. Step by step, we will build the entire Agentic AI chatbot project.
+
+Thank you, and I will see you in the next video.
+
+**E) Designing The Front End Using streamlit**
+
+In this video, we continue the development of our end-to-end Agentic AI project with Landgraf by focusing on building the front-end UI. We begin by creating a modular front-end using Streamlit, emphasizing component-to-component implementation for clarity and maintainability. The front end consists of a sidebar with fields for selecting LMS models, APIs, and use cases, along with a main messaging area for user interaction. All front-end development is organized within the UI folder, where we create a Streamlit subfolder containing three main files: load_ui.py for loading the UI, display_result.py for displaying results, and ui_config_file.ini to store constants such as model names, LMS options, and use case options.
+
+Next, we implement the configuration handler using Python’s configparser module. A dedicated class Config is created inside ui_config_file.py to read the .ini file and provide methods for retrieving constants such as LMS options, use case options, Grok model options, and page title. This modular approach ensures that all constants are centralized, easily maintainable, and can be retrieved dynamically in the UI code. Methods like get_lm_options() and get_use_case_options() are used to return lists of values from the configuration, allowing the front-end code to dynamically populate dropdowns and other UI elements.
+
+Once the configuration handler is ready, we move on to designing the Streamlit UI itself in load_ui.py. A class LoadStreamlitUI is created, which loads the configuration and initializes user controls as a dictionary. The sidebar is constructed using Streamlit’s selectbox and text_input widgets, allowing users to select LMS models, choose use cases, and enter API keys. Conditional logic is applied so that, for example, selecting Grok dynamically populates the available models and provides an input box for the API key. This ensures a seamless and interactive front-end experience.
+
+Finally, we integrate the UI with the main application flow. In main.py, we import the LoadStreamlitUI class and define a function load_landgraf_agentic_ai_app() to initiate the Streamlit UI, load sidebar options, and handle user input. This function is then called from app.py, serving as the entry point for the application. By running streamlit run app.py, the full front-end UI is launched, displaying a basic chatbot interface with configurable LMS models and use cases. This modular design not only simplifies front-end development but also ensures that the backend workflow can be seamlessly triggered from user selections, setting the stage for implementing the actual AI use cases in the next steps.
+
+**F)  Implementing The LLM Module In Graph Builder**
+
+In this video, we continue the development of our end-to-end project by focusing on implementing the workflow that triggers whenever a user sends a message. We begin by revisiting the previously developed Streamlit front end, where the sidebar integrates constants such as LMS options, available models like Grok, and use cases such as the basic chatbot. The main chat input is handled in main.py, while configuration constants are managed in ui_config_file.ini and read through ui_config.py. The front-end structure is now fully set up, and the next step is to ensure that sending a message triggers the workflow, with all necessary components loaded dynamically.
+
+To facilitate this, we start by loading all required LMS models. A dedicated file lm.py is created in the LM folder to handle model initialization. This file reads API keys provided through the front end via Streamlit’s session_state, specifically the user_controls dictionary. The goal is to write generic code so that, when a user provides an API key, the respective LMS model—such as Grok—can be loaded automatically when the workflow executes. By structuring LMS initialization this way, it becomes easy to add additional models like OpenAI or Google Gemini in the future.
+
+The LMS loading logic is encapsulated in a GrokLM class. This class receives user control inputs from the front end and stores them as a class variable for use across its methods. The get_model() method is responsible for loading the selected LMS model based on the user-provided API key and model selection. Error handling ensures that if no API key is provided or the environment is not set, a Streamlit error is raised instructing the user to provide the key. Upon successful initialization, the model instance is returned, ready for use in the workflow. This modular and extensible design allows other LMS models to be added easily by creating separate files following the same pattern.
+
+Finally, this step sets the stage for building the workflow graph, where independent nodes and functionalities will be constructed in subsequent development. By preloading LMS models and integrating user inputs from the front end, the system ensures that workflows can be executed seamlessly whenever a message is entered. This modular approach not only simplifies model management but also provides a scalable foundation for supporting multiple LMS platforms in the future, paving the way for building the complete AI-driven workflow in the next video.
+
+**G) Implementing The Graph Builder Module**
+
+In this video, we continue our end-to-end project implementation, now focusing on building the workflow for a basic chatbot using LangGraph. After completing the LM module in the previous video, the next step is to design the workflow itself. We start by conceptualizing a simple chatbot graph consisting of three stages: start, chatbot, and end. This minimal setup demonstrates the fundamental structure of a chatbot workflow, which can later be extended to more complex use cases. The focus here is to establish the basic flow and graph framework before diving into specific node functionalities.
+
+The workflow implementation begins with the creation of a graph_builder.py file, where a GraphBuilder class is defined. The class is initialized with the loaded LM model and sets up a graph_builder object to manage the workflow graph. For graph management, we use the StateGraph library and define a shared state structure in state/state.py. This state class uses type annotations and reducers to maintain a list of messages within the graph. By organizing the state separately, we ensure that all nodes in the graph can access and update shared information consistently.
+
+Next, the basic chatbot workflow is constructed by defining nodes and edges in the graph. The nodes include start, chatbot, and end, and edges are added to connect them sequentially. The chatbot node itself is modular and its functionality is implemented separately in the nodes folder. Specifically, a file named basic_chatbot_node.py is reserved for the chatbot’s logic, which will handle taking user input and generating responses using the loaded LM. This modular structure allows additional nodes or chatbot variations to be easily added later, following the same design pattern.
+
+By the end of this video, the foundational components of the graph builder and workflow are in place. The next step, which will be covered in the following video, is to implement the actual node functionality for the basic chatbot, linking it with the LM to generate responses. This approach ensures a scalable and reusable architecture, where multiple workflows or chatbot variations can be built on top of the same graph and state management framework. The video emphasizes the importance of separating graph structure, state management, and node logic for a clean and maintainable implementation.
+
+**H) Implementing The Node Implementation**
+
+In this video, we continue our end-to-end project by implementing the core functionality of the basic chatbot node. While the previous video focused on building the graph structure for the chatbot workflow, this session specifically addresses the node definition and its behavior. The first step is to create a BasicChatbotNode class inside the nodes folder, which encapsulates the chatbot logic. The class is initialized with the previously loaded LM model, ensuring that the AI assistant is ready to process incoming user messages. This separation of the node from the graph builder maintains modularity, making it easier to add additional nodes or chatbot variations in the future.
+
+The main functionality of the BasicChatbotNode class is implemented in a process method, which takes the workflow state as input and returns a dictionary of messages. The state object, defined in state/state.py, keeps track of the conversation history, ensuring that all user messages and responses are maintained consistently throughout the workflow. Within the process method, the LM model is invoked using the messages from the state, generating a response to the user input. This approach ensures that the node itself is solely responsible for handling the AI interaction, keeping it decoupled from other workflow components.
+
+After defining the node functionality, the next step is to integrate it with the graph builder. The BasicChatbotNode is imported into the graph_builder.py file and initialized with the LM model. The process method of this node is then linked to the chatbot node within the graph, creating a complete pipeline from user input to AI response. By following this design, the entire workflow now has all its critical components in place: the frontend UI, LM model loading, graph construction, node functionality, and state management. This sets the stage for the next step, which is full end-to-end integration, linking the frontend input directly to the workflow execution and response generation.
+
+**I) Integrating the Entire Pipeline With Front End**
+
+In this video, we focus on integrating the entire Agentic AI pipeline developed using Landgraf into a seamless end-to-end workflow. With the frontend, LM module, graph builder, and node functionalities already in place, the main task is to connect these components so that user input triggers the complete pipeline. The workflow begins when a user submits a message through the Streamlit UI. This input initiates the loading of the LM model, execution of the appropriate graph workflow, and processing of node-specific logic to generate a response.
+
+The first step in the integration involves configuring the LM module. This is achieved by initializing the GrokLM class with user control inputs obtained from load_ui.py. Once the LM is loaded successfully, the system retrieves the selected use case from the UI—such as the basic chatbot—and passes it to the GraphBuilder class. The setup_graph function in GraphBuilder ensures that the correct workflow nodes are initialized based on the chosen use case. This modular approach allows different workflows to be handled efficiently without changing the core integration logic.
+
+After setting up the graph, the next step is execution and displaying the response. The display_result.py module in the UI folder handles rendering the assistant’s output back to the user. It takes the use case, the initialized graph, and the user message, streaming the AI response on the UI as soon as the LM processes the input. This setup ensures a fully functional end-to-end pipeline where the frontend, LM, graph workflow, node logic, and UI output are all connected. The video concludes by explaining that the next step will involve running the entire application from app.py to verify the workflow execution and handle any potential errors.
+
+**J) Testing The End To End Agentic Application**
+
+In this video, we finally execute the entire end-to-end pipeline of the Agentic AI project using Landgraf. With all components—frontend, LM module, graph builder, node functionalities, and UI integration—already implemented, the goal is to run the application and verify that everything works seamlessly. The workflow is triggered when a user sends a message via the Streamlit UI, which initiates the loading of the LM model, execution of the selected graph workflow, processing of node-specific logic, and streaming of the AI response back to the UI.
+
+During the initial run, a minor import error related to List from typing_extensions was encountered. This was quickly resolved by updating the import to use a capitalized List, highlighting the importance of careful library usage. Once corrected, the application successfully loaded, and the user could select the chatbot use case and enter their API key. Testing the chatbot demonstrated that the LM processed the input, the graph executed properly, and the assistant’s response was displayed correctly, verifying that the pipeline—from frontend to backend nodes to output display—was fully functional.
+
+This video also emphasized modularity and code reusability in the project. Each component, from main.py to graph builder to node implementation, was integrated step by step, making it easy to extend the project in the future. The instructor highlighted that this modular structure allows new use cases, such as a chatbot with external tools, to be added without changing the existing core logic. The next steps in the project series will include building a more advanced chatbot that can interact with external tools, perform web searches, or provide summarization, demonstrating the flexibility and scalability of this pipeline-based approach.
