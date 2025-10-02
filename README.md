@@ -126,9 +126,63 @@
 
 **J) Testing The End To End Agentic Application**
 
+**XVI) End To End Agentic Chatbot With Web Search Functionality**
+
+**A) Introduction To The Project**
+
+**B) Implementing The Front End With Streamlit**
+
+**C) Implementing GraphBuilder and Search Tools Pipeline**
+
+**D) Implementing Node Functionality With End To End Agentic Pipeline**
+
+**XVII) AI News Summarizer End To End Agentic AI Projects**
+
+**A) Project Introduction**
+
+**B) Building the Front End With Streamlit**
+
+**C) Building The AI News State Graph Builder**
+
+**D) Tavily Client Search Fetch News Node Implementation**
+
+**E) AI News Summarize Node Functionality Implementation**
+
+**F) Save Results Node Functionality Implementation**
+
+**G) Running The Entire AINEWS Agentic Workflow**
+
+**XVIII) End To End Blog Generation Agentic AI App**
+
+**A) Introduction And Project Demo**
+
+**B) Building Project Structure Using UV Package**
+
+**C) Blog Generation Grpah Builder And State Implementation**
+
+**D) Blog Generation Node Implementation Definition**
+
+**E) Creating Blog Generating API Using FAST API**
+
+**F) Integrating Langgraph Studion For Debugging**
+
+**G) Blog Generation And Translation With Language**
+
+**H) Building Blog Generation And Translation Graph Builder**
+
+**I) Blog Generation And Translation Node Implementation**
+
+**J) Testing In Postman And Langgraph Studio**
+
 **XIX) Model Context Protocol**
 
-**AA) Demo of MCP with Claude Desktop**
+**A) Demo of MCP with Claude Desktop**
+
+**B) Cursor IDE Installation**
+
+**C) Getting Started With Smithery AI**
+
+**D) Building MCP Servers With Tools And Client From Scratch Using Langchain**
 
  #### Always create .env file in the venv - It is for LLM Models, OpenAI Keys, GroQ Keys, LangSmith keys [All those Environment variables and keys we will be storing there]
 
@@ -3165,3 +3219,1212 @@ In this video, we finally execute the entire end-to-end pipeline of the Agentic 
 During the initial run, a minor import error related to List from typing_extensions was encountered. This was quickly resolved by updating the import to use a capitalized List, highlighting the importance of careful library usage. Once corrected, the application successfully loaded, and the user could select the chatbot use case and enter their API key. Testing the chatbot demonstrated that the LM processed the input, the graph executed properly, and the assistant’s response was displayed correctly, verifying that the pipeline—from frontend to backend nodes to output display—was fully functional.
 
 This video also emphasized modularity and code reusability in the project. Each component, from main.py to graph builder to node implementation, was integrated step by step, making it easy to extend the project in the future. The instructor highlighted that this modular structure allows new use cases, such as a chatbot with external tools, to be added without changing the existing core logic. The next steps in the project series will include building a more advanced chatbot that can interact with external tools, perform web searches, or provide summarization, demonstrating the flexibility and scalability of this pipeline-based approach.
+
+# **XVI) End To End Agentic Chatbot With Web Search Functionality**
+
+**A) Introduction To The Project**
+
+Hello guys, congratulations! We have successfully finished our first end-to-end Genetic AI project wherein we built a basic chatbot. Now, we are going to move into our second project, which is a chatbot with tool integration. In this project, we will be extending our previous work by integrating an external tool so that the chatbot can fetch live information when needed.
+
+This project is centered around a workflow. Let’s say we have a workflow where we integrate with an external web search API called Tabulae. With the help of this API, our chatbot assistant will be able to provide accurate, real-time information from the internet. To demonstrate, I’ll first select a specific model in the application. After selecting the model, we apply the API key to allow the chatbot to make requests to the Tabulae API. The basic chatbot functionality is already implemented, and now we will enhance it to become a chatbot with a tool.
+
+The Tabulae API is essentially an external search engine. Once you navigate to the API provider's website, you will find an API key that allows up to 500–600 requests per day. After entering this API key in our application, we can test the tool integration. For instance, if I input the question, hey, provide me the recent AI news, the chatbot will trigger a tool call by executing something similar to: "response = tabulae.search('recent AI news')" and fetch results from the API. The tool call starts, retrieves the relevant data, and returns the latest AI news. The results include updates like Google’s May announcements, product research highlights, and other detailed information. For transparency, the application also prints the entire tool call using a Python snippet such as "print(tool_call_response)".
+
+The workflow is simple but powerful. We start with a basic workflow diagram where the assistant node connects to the tool node. In Python, this can be represented as: "assistant_response = assistant.handle(user_input)" and "tool_response = tabulae.query(user_input)". The assistant checks if the user’s question requires external data; if yes, it triggers the tool call and includes the retrieved information in the final response. If the query is general, like what is machine learning?, the assistant does not call the tool. Instead, the LLM integrated in the chatbot directly generates an answer, for example: "response = llm.generate('what is machine learning?')" without hitting the API.
+
+This design ensures that whenever a user input comes in, the assistant intelligently decides whether to provide an immediate response or fetch external data using the tool. When external data is fetched, it is taken as context by the LLM to generate an accurate and context-aware response. In Python terms, the context usage can be shown as: "contextual_response = llm.generate(prompt=user_input, context=tool_response)".
+
+By the end of this project, we will have a complete frontend interface with a modular structure similar to our previous chatbot. We will add a new use case for the chatbot with tool, reuse the same text box for input, and define a new node function in Python to handle the tool integration, such as: "def handle_tool_node(input_text): return tabulae.query(input_text)". This structure allows us to connect any number of external tools as required, making the chatbot highly extensible.
+
+In summary, this project extends our first chatbot by enabling external tool integration. General questions are answered by the LLM, while queries requiring live or updated information trigger a tool call using APIs like Tabulae. The retrieved data is used as context for generating responses, resulting in a smarter, real-time, and interactive chatbot assistant. In the next video, we will start implementing this chatbot with external tools project step by step. This is just one example, and the architecture allows integrating multiple tools for various use cases.
+
+I hope you enjoyed this video. See you in the next one. Thank you, and take care!
+
+**B) Implementing The Front End With Streamlit**
+
+Hello guys, welcome to the implementation part of our second project, which is a chatbot with external web search capability. This chatbot will be built using agentic AI capabilities. In the UI, we have the main layout with the sidebar already in place. The first thing we need to do is add a new option for this chatbot. To do this, we first update our configuration file. In the configuration, we add a new option under the chatbot section called "chatbot with web", which indicates that this chatbot will have some web functionality. Previously, it was labeled "chatbot with tool", but for clarity, we rename it to "chatbot with web".
+
+Next, we move to the UI implementation in load_ui.py. Here, we need to handle different use cases and open the API key input field dynamically when the user selects the "chatbot with web" option. We implement this condition in Python as:
+
+if self.user_control.selected_usecase == "chatbot with web":
+    self.tab_key = self.user_control.tabulae_api_key
+    st.session_state["tabulae_api_key"] = self.tab_key
+
+
+This ensures that the API key provided by the user is saved in the session state for persistence across the session. We create the input field using Streamlit’s text_input function:
+
+self.tab_key = st.text_input("API Key", type="password", help="Enter your Tabulae API key")
+
+
+We also validate whether the user has entered an API key. If not, we show a warning:
+
+if not self.tab_key:
+    st.warning("Please provide your API key from https://app.tabulae.com")
+
+
+After these front-end changes, we test the application by running:
+
+streamlit run app.py
+
+
+Initially, the API key field may not appear if there are spelling mismatches. For instance, if "chatbot with web" is written with a lowercase "w" in one place and capital "W" in another, the condition will not trigger. Correcting the spelling resolves this, and upon selecting the "chatbot with web" option, the API key input field becomes visible.
+
+With the front-end configuration complete, we move to main.py. No major changes are required here since the main structure already accommodates different chatbot types. The next step is to open the graph builder. Just like we created a graph for the basic chatbot, we now need to define a new graph for the chatbot with web capabilities. This involves defining nodes and workflows in the graph that integrate external tool functionality.
+
+In the next session, we will focus on building this graph in the graph builder. We will also implement the node functionalities required to handle external tool calls. The main difference from other use cases is that we are integrating an external API tool—Tabulae—into the workflow. The structure remains largely the same: the changes are primarily in two files: the graph builder and the node functionality implementation.
+
+To summarize, in this session, we configured the front end by adding a new chatbot option "chatbot with web" and made the API key input field conditional based on the selected use case. These changes were updated in the configuration file and tested in Streamlit. In the next session, we will implement the graph builder and node logic to enable external web search through the tool.
+
+That’s it for this session. I hope you found this helpful. See you in the next video. Thank you, and take care!
+
+**C) Implementing GraphBuilder and Search Tools Pipeline**
+
+Hello guys, now we are going to continue our discussion on the end-to-end second project. In the previous video, we completed the front-end part by adding an additional option for the chatbot. Now, our focus is to implement the entire workflow and integrate the Tabulae API with our chatbot assistant using the same workflow. To start, we open the graph_builder.py file. Previously, we built a basic chatbot graph for our first project. Similarly, for this project, we define a new function called chatbot_with_tools_build_graph that will handle the advanced chatbot workflow with tool integration. We add a docstring describing the function, for example:
+
+"""
+Build an advanced chatbot graph with tool integration.
+This method creates a chatbot graph that includes both the chatbot node and a tool node.
+It defines tools, initializes the chatbot with tool capabilities, and sets up conditional and direct edges between nodes.
+The chatbot node is set as the entry point.
+"""
+
+
+The next step is to define the tools. Since we need to make external API calls, each tool becomes a separate node in the graph. In the tools folder, we create a new file called search_tool.py. This tool is responsible for integrating with search engines like Tabulae. We import the required modules:
+
+from langchain_community.tools.search import tab_search_results
+from langgraph.prebuilt import tool_node
+
+
+We then define a function get_tools that returns a list of tools available in our application. For now, we use Tabulae as the search tool:
+
+def get_tools():
+    tools = tab_search_results(maximum_results=2)
+    return tools
+
+
+Next, we define a helper function create_tool_node to convert these tools into nodes that can be used in the graph:
+
+def create_tool_node(tools):
+    """
+    Create and return a tool node for the graph.
+    """
+    return tool_node(tools=tools)
+
+
+Returning to graph_builder.py, we call get_tools() to retrieve our tools and create_tool_node(tools) to generate the tool node. The LM is already loaded in the graph builder, so we assign it to self.lm. After this, we add nodes to the graph: first the chatbot node and then the tool node:
+
+self.graph_builder.add_node("chatbot")
+self.graph_builder.add_node("tools", tool_node)
+
+
+Now we define the edges in the graph. The workflow starts from the chatbot, and depending on the input, it either calls the tool or proceeds to the end node. Conditional edges are required to handle this logic. The tools_condition object determines whether a user query requires a tool call or a direct response from the chatbot. The edges are defined as:
+
+self.graph_builder.add_edge("start", "chatbot")
+self.graph_builder.add_edge("chatbot", "tools", condition=tools_condition)
+self.graph_builder.add_edge("chatbot", "end")
+self.graph_builder.add_edge("tools", "chatbot")
+self.graph_builder.add_edge("chatbot", "end")
+
+
+This structure ensures that from the assistant (chatbot), queries either go to the tool for fetching external data or directly to the end. After defining these edges, the graph handles conditional flows automatically, so additional checks are simplified.
+
+Finally, we link this workflow to the front-end configuration. If the user selects "chatbot with web" in the UI, the function chatbot_with_tools_build_graph is called to construct this advanced graph. Two key things were achieved in this session: first, we created the tools and converted them into nodes, and second, we built the entire graph with conditional edges for the workflow.
+
+In the next video, we will define the chatbot node in detail. This includes writing a function to handle user input, make tool calls if necessary, and return a response. For clarity, instead of using the label “assistant,” we will refer to it as "chatbot_tools" in the graph, which represents the same chatbot node integrated with tool capabilities.
+
+That’s it for this session. I hope you found this explanation clear. In the next session, we will implement the node functionality for making tool calls and generating responses. Thank you, and take care!
+
+**D) Implementing Node Functionality With End To End Agentic Pipeline**
+
+Hello guys, we are going to continue our discussion on the end-to-end second project. In the previous session, we built the function to construct the entire graph for our use case, which involves integrating an external tool, Tabulae. In this video, we will define the node functionality, which is a crucial part of the workflow.
+
+First, we create a new Python file in the nodes folder called chatbot_with_tool_node.py. This file will contain the definition of the node responsible for handling both the chatbot logic and tool integration. We import the shared state management from our state.py file so that all messages and information are accessible across nodes:
+
+from src.agenda.i.state.state import state
+
+
+Next, we define a class ChatbotToolNode and its __init__ method. This class will initialize the language model (LM) and act as a wrapper for invoking the LM with tool integration:
+
+class ChatbotToolNode:
+    """
+    Chatbot node enhanced with tool integration.
+    """
+    def __init__(self, lm):
+        self.lm = lm
+
+
+The process function is responsible for generating a response based on the current state. It retrieves the last user message, invokes the LM, and returns both the LM response and a placeholder tool response:
+
+def process(self, state):
+    last_message = state.messages[-1] if state.messages else ""
+    response = self.lm.invoke(last_message, role="user")
+    tool_response = f"Tool integration for user input: {last_message}"
+    return response, tool_response
+
+
+We also define a create_chatbot function to bind the tools to the LM. This ensures that tool calls are handled automatically whenever the chatbot node is invoked:
+
+def create_chatbot(self, tools):
+    """
+    Create and return a chatbot node with tool integration.
+    """
+    def chatbot_node(messages):
+        return self.lm.invoke_with_tools(messages, tools=tools)
+    return chatbot_node
+
+
+This allows us to have two ways of invoking the LM:
+
+Direct LM invocation using the process method.
+
+LM with tools using the create_chatbot binding function.
+
+In the graph_builder.py, we import this node:
+
+from c.i.nodes.chatbot_with_tool_node import ChatbotToolNode
+
+
+We initialize it with our LM and create the chatbot node bound to the tools:
+
+chatbot_node_obj = ChatbotToolNode(self.lm)
+chatbot_node = chatbot_node_obj.create_chatbot(tools)
+
+
+Once the graph is built with this node, it can be executed. We also need to handle UI integration for the new "chatbot with web" option. In main.py or the Streamlit interface, we add a condition for this use case:
+
+elif selected_use_case == "chatbot with web":
+    response, tool_response = chatbot_node(state.messages)
+    if tool_response:
+        state.write("tool", tool_response)
+    state.write("assistant", response)
+
+
+This ensures both the LM response and tool response are displayed in the Streamlit frontend.
+
+When running the app (streamlit run app.py), you provide your API key for Tabulae. The chatbot with web tool should now work as expected. On testing, the tool fetches results, displays URLs, images, and summaries. This implementation allows further extensions—for example, creating a news summary use case that fetches detailed news instead of single-pointer outputs.
+
+In summary, this session covered:
+
+Creating a new node class ChatbotToolNode.
+
+Defining process and create_chatbot functions to handle LM and tool integration.
+
+Integrating the node in graph_builder.py and binding tools.
+
+Updating the UI logic in Streamlit to handle "chatbot with web" responses.
+
+The next steps could include extending this node for multiple tools and advanced output formatting, such as generating detailed news summaries or blog content.
+
+This completes the node implementation for the chatbot with web integration. Everything should now run correctly, and the graph will fetch data from Tabulae and return structured outputs in the UI.
+
+# **XVII) AI News Summarizer End To End Agentic AI Projects**
+
+**A) Project Introduction**
+
+I’m super excited because now we are going to implement our third project, called the AI News Summarizer. To recap, we have already completed two end-to-end projects. The first one was a Basic Chatbot, where we used modular coding to design the front end, build a Graph Builder, and implement node functionality. The workflow was simple: user input flows into the chatbot, the LM processes it, and the response is returned to the end state. The second project was a Chatbot with Web Search, where we integrated an external tool (Tabulae) as a tool node in our graph. The LM decided whether to make a tool call based on the input, and we also implemented tool conditions and conditional edges. For example, asking “Provide me recent AI news” triggered the tool, which returned a summarized response. However, the summarization quality was not ideal.
+
+Now, in the AI News Summarizer, we are increasing the complexity. The goal is to create a more structured and accurate news summarization workflow using a multi-node graph. The workflow will have three nodes: Node 1 fetches news, Node 2 summarizes it, and Node 3 saves and displays it.
+
+Node 1: Fetch News – In this node, we accept the user’s input for the news timeframe, which can be daily, weekly, or monthly. We then interact with an external news API to fetch the latest news. The Python code for this node could look like:
+
+class FetchNewsNode:
+    def __init__(self, api_client):
+        self.api_client = api_client
+    def process(self, timeframe: str):
+        if timeframe == "daily":
+            news = self.api_client.get_daily_news()
+        elif timeframe == "weekly":
+            news = self.api_client.get_weekly_news()
+        else:
+            news = self.api_client.get_monthly_news()
+        return news
+
+
+This node returns the raw news content to Node 2 for summarization.
+
+Node 2: Summarize News – This node uses a language model (LM) to summarize the news content received from Node 1. The LM produces structured summaries, either as paragraphs or bullet points, depending on the prompt. For example, the Python code could be:
+
+class SummarizeNewsNode:
+    def __init__(self, lm_model):
+        self.lm = lm_model
+    def process(self, news_content: str):
+        prompt = f"Summarize the following news in clear bullet points:\n{news_content}"
+        summary = self.lm.generate(prompt)
+        return summary
+
+
+This approach ensures the summary is coherent, readable, and formatted for easy consumption.
+
+Node 3: Save and Display – In this node, we save the summarized news into a file (Markdown, PDF, etc.) and also display it on the Streamlit frontend. The Python code might be:
+
+class SaveDisplayNode:
+    def __init__(self, save_path: str):
+        self.save_path = save_path
+    def process(self, summary: str):
+        with open(self.save_path, "w") as f:
+            f.write(summary)
+        return summary
+
+
+With this structure, the workflow from input to output becomes modular and maintainable. Each node has a single responsibility, which makes it easy to add new features in the future, such as integrating additional APIs or improving summarization techniques.
+
+Graph Builder Integration – Now we create a graph that connects these nodes. The input first passes to FetchNewsNode, then the output flows into SummarizeNewsNode, and finally into SaveDisplayNode. The Python code for building this graph might look like:
+
+class NewsGraphBuilder:
+    def __init__(self, fetch_node, summarize_node, save_node):
+        self.fetch_node = fetch_node
+        self.summarize_node = summarize_node
+        self.save_node = save_node
+    def run(self, timeframe: str):
+        news_content = self.fetch_node.process(timeframe)
+        summary = self.summarize_node.process(news_content)
+        final_output = self.save_node.process(summary)
+        return final_output
+
+
+Streamlit Frontend Integration – In the Streamlit app, the user can select a model, provide their API key, and choose the news timeframe (daily, weekly, monthly). Once they click “Fetch Latest News”, the graph is executed and results are displayed. The Python code snippet could be:
+
+import streamlit as st
+
+st.title("AI News Summarizer")
+timeframe = st.selectbox("Select news timeframe:", ["daily", "weekly", "monthly"])
+api_key = st.text_input("Enter API Key:")
+
+if st.button("Fetch Latest News"):
+    fetch_node = FetchNewsNode(api_client=NewsAPIClient(api_key))
+    summarize_node = SummarizeNewsNode(lm_model=MyLLMModel(api_key))
+    save_node = SaveDisplayNode(save_path="news_summary.md")
+    graph = NewsGraphBuilder(fetch_node, summarize_node, save_node)
+    result = graph.run(timeframe)
+    st.text_area("Summary", result)
+
+
+This completes the end-to-end AI News Summarizer workflow. We now have a multi-node agentic AI application that fetches news, summarizes it with high quality, saves it in a file, and displays it in the Streamlit app. This structure is modular, maintainable, and ready for extension with additional features like multi-source news, richer summarization prompts, or alternative file formats.
+
+In the next step, we will start implementing this step by step, beginning with the UI changes, then building the Graph Builder, followed by implementing each node, and finally integrating everything with Streamlit.
+
+**B) Building the Front End With Streamlit**
+
+Let’s proceed with the implementation of AI News Summarizer, a generic AI application. As usual, for any use case, we begin with the UI part. In this project, we need to add a new option for AI news in our Streamlit interface. Along with this, we will require the API key and a selection for the news timeframe—daily, weekly, or monthly. This will allow the user to fetch the latest AI news based on their selection.
+
+First, we open our configuration file and add a new entry for the AI news use case:
+
+use_cases = ["chatbot", "chatbot_with_web", "ai_news"]
+
+
+This ensures that our UI knows about the new option. Next, we move to the load UI function, which is responsible for rendering the Streamlit interface. Here, we need to add conditions to handle this new use case. For example, in Python:
+
+if self.user_controls.selected_use_case in ["chatbot_with_web", "ai_news"]:
+    api_key = st.text_input("Enter API Key:")
+
+
+This ensures that the API key input appears when the user selects AI News.
+
+Next, we need to provide a news timeframe selection. We add a new header and selectbox in the sidebar for the AI News Explorer:
+
+if self.user_controls.selected_use_case == "ai_news":
+    st.sidebar.header("AI News Explorer")
+    timeframe = st.sidebar.selectbox("Select Time Frame:", ["daily", "weekly", "monthly"])
+
+
+This allows the user to choose the timeframe for news fetching. Alongside this, we add a button to fetch the latest AI news. We maintain the selection in a session state to preserve user choices:
+
+if st.sidebar.button("Fetch Latest AI News"):
+    st.session_state["fetch_button_clicked"] = True
+    st.session_state["selected_timeframe"] = timeframe
+
+
+By storing the timeframe and button click state in the session, we ensure that the user’s selection persists across interactions.
+
+Once these UI components are added, we can run our Streamlit app to verify that everything works. In the command line:
+
+streamlit run App.py
+
+
+After running this, the AI News Explorer should appear when selecting the AI News use case. The user can now select daily, weekly, or monthly and click the Fetch Latest AI News button. The API key input will also be visible.
+
+To summarize, the UI changes we implemented include:
+
+Adding a new use case ai_news.
+
+Displaying the API key input when AI News is selected.
+
+Adding a sidebar selection for news timeframe (daily, weekly, monthly).
+
+Adding a Fetch Latest AI News button and storing the selection in the session state.
+
+This completes the frontend implementation for the AI News Summarizer. While knowledge of Streamlit is helpful, the main learning is in building the graph builder and node implementation, which we will cover next. The UI simply collects user input and triggers the workflow.
+
+In the next video, we will proceed to define and build the graph builder, connecting the fetch, summarize, and save/display nodes to create a complete AI News Summarizer workflow.
+
+**C) Building The AI News State Graph Builder**
+
+We are going to continue our discussion on the AI News Summarizer project. In the previous video, we completed the frontend UI, and now we will move on to building the graph that defines the workflow for our summarizer. For this, we will work inside the graph_builder.py file. Similar to how we created functions for the basic chatbot or chatbot with tools, we will now define a graph specifically for AI news.
+
+We begin by creating a function called ai_news_builder. This function will be responsible for defining the structure of our graph, including all nodes and edges. In Python, the function definition looks like this:
+
+def ai_news_builder(self):
+    self.graph_builder = GraphBuilder()
+
+
+Inside this function, we first add the nodes that represent the main steps of our workflow. The workflow for AI news summarization includes four main nodes: fetch_news, summarize_news, save_results, and end. We can add them like this:
+
+# Add nodes
+self.graph_builder.add_node("fetch_news")
+self.graph_builder.add_node("summarize_news")
+self.graph_builder.add_node("save_results")
+self.graph_builder.add_node("end")
+
+
+After defining the nodes, we need to define the edges that connect these nodes, which determines the flow of execution. The first edge connects the start to fetch_news. We set this as the entry point of the graph:
+
+# Set entry point
+self.graph_builder.set_entry_point("fetch_news")
+
+
+Next, we connect fetch_news to summarize_news, ensuring that the output of the fetch node is passed to the summarize node:
+
+# Add edges
+self.graph_builder.add_edge("fetch_news", "summarize_news")
+
+
+Similarly, we connect summarize_news to save_results, which will handle storing the summarized output:
+
+self.graph_builder.add_edge("summarize_news", "save_results")
+
+
+Finally, we connect the last node, save_results, to the end node to complete the workflow:
+
+self.graph_builder.add_edge("save_results", "end")
+
+
+With this, we have defined the nodes and edges of our AI News Summarizer graph. To summarize, the structure includes:
+
+Nodes: fetch_news, summarize_news, save_results, end.
+
+Edges: Start → fetch_news → summarize_news → save_results → End.
+
+At this stage, we are only defining the graph structure. The implementation of each node—what fetch_news, summarize_news, and save_results actually do—will be handled in the node implementation stage, which we will cover in the next video.
+
+In the next step, we will create a node builder function, e.g., ai_news_builder_node, and implement the logic for each node. The fetch_news node will call the news API, summarize_news will process the content using our LLM, and save_results will store the results in a markdown or PDF format and display it in Streamlit.
+
+This completes the graph builder setup for AI News Summarizer. Now, our graph is ready to be populated with node logic, and this modular approach allows us to maintain a clean and extensible workflow.
+
+**D) Tavily Client Search Fetch News Node Implementation**
+
+We are continuing our discussion on the AI News Summarizer project. In the previous video, we built the entire graph structure, defining the nodes fetch_news, summarize_news, save_results and the edges connecting them. The graph flows from start → fetch_news → summarize_news → save_results → end. Now, the major step left is the implementation of each node, i.e., the actual functions that perform the tasks defined by the nodes.
+
+The first node to implement is fetch_news. This node will call an API, specifically the Tableau API, to fetch AI news, and pass the fetched data to the summarize node. To start, we create a file inside the node folder called "ai_news_node.py" which will contain our node logic.
+
+We start by importing the necessary libraries. Since we will use the Tableau API, we import the Tableau client, and we also import prompt templates from LangChain for summarization:
+
+from tableau import TableauClient
+from langchain.prompts import chart_prompt_template
+
+
+Next, we define a class "AI_News_Node" which will initialize the Tableau client and maintain the LLM instance, along with a state variable to store intermediate data:
+
+class AI_News_Node:
+    def __init__(self, tableau_api_key, llm):
+        """
+        Initializes the AI news node with Tableau client and LLM instance.
+        """
+        self.w = TableauClient(api_key=tableau_api_key)
+        self.llm = llm
+        self.state = {}
+
+
+Here, the state dictionary will capture the steps of the workflow, storing data like fetched news and summaries.
+
+Now, we implement the fetch_news function. This function takes a state dictionary as input and retrieves the news frequency (daily, weekly, monthly) from it. This frequency is then mapped to Tableau’s API parameters and used to query the news:
+
+def fetch_news(self, state: dict):
+    """
+    Fetches AI news from Tableau API based on the frequency specified in state.
+    """
+    # Get user-selected frequency from state
+    frequency = state['message_state']['content'].lower()
+    state['frequency'] = frequency
+    # Map frequency to Tableau API parameters
+    time_range_map = {'daily': 'D', 'weekly': 'W', 'monthly': 'M'}
+    days_map = {'daily': 1, 'weekly': 7, 'monthly': 30}
+    # Fetch news using Tableau client
+    response = self.w.search(
+        query="AI technological news India and globally",
+        time_range=time_range_map[frequency],
+        max_results=20,
+        days=days_map[frequency]
+    )
+    # Store results in state
+    news_data = response.get('results', [])
+    state['news_data'] = news_data
+    return state
+
+
+In this function:
+
+We retrieve the frequency from the state (daily, weekly, or monthly).
+
+We map the frequency to API-specific parameters (D, W, M) and corresponding days.
+
+We call the Tableau client’s search function with the topic "AI technological news India and globally", specifying the frequency, max results, and days.
+
+We store the fetched results in the state dictionary under the key "news_data" and return the updated state.
+
+This completes the fetch_news node implementation. Later, the output stored in state['news_data'] will be passed to the summarize_news node, which will use an LLM to generate structured summaries, and finally to the save_results node, which will save the summaries in markdown or PDF format.
+
+**E) AI News Summarize Node Functionality Implementation**
+
+Now that we have completed the fetch_news functionality, the next key node to implement is the summarize node. This node will take the news data fetched in the previous step and summarize it using a prompt template and our LLM. The idea here is to convert each news article into a concise, well-structured summary in markdown format, including the date and the source URL.
+
+We define a new function "summarize" inside our AI_News_Node class. This function takes the state dictionary as input, which already contains the key "news_data" filled with the fetched news:
+
+def summarize(self, state: dict):
+    """
+    Summarizes the news data fetched from Tableau API using a prompt template.
+    """
+    # Extract news items from state
+    news_items = state['news_data']
+
+
+Next, we define a prompt template. This template instructs the LLM how to structure the summary. For instance, it should summarize each article into markdown format, include the publication date, write concise sentences, sort news by date, and include the source URL as a link. The template might look like this:
+
+system_prompt = """
+Summarize a news article into markdown format for each item.
+Include the date in ISO format.
+Provide a concise sentence summary for the latest news.
+Sort news by date.
+Include source URL as a link.
+Format: Summary - URL
+"""
+
+
+After defining the prompt, we need to prepare the news data. Each news item contains fields like "content", "url", and "publish_date". We join these fields line by line for all articles to create a single string that will be fed into the prompt:
+
+articles_str = "\n".join([
+    f"Content: {item['content']}\nURL: {item['url']}\nDate: {item['publish_date']}"
+    for item in news_items
+])
+
+
+Finally, we invoke the LLM using the prompt template and supply the concatenated news articles as the context. The summarized output is then stored back in the state dictionary under the key "summary":
+
+summary_output = self.llm.invoke_prompt_template.format(articles=articles_str)
+
+# Update the state with the summarized news
+state['summary'] = summary_output
+
+return state
+
+
+To summarize this workflow:
+
+Extract news items from the state dictionary.
+
+Define a system prompt for the summarization LLM.
+
+Concatenate the news articles into a single string in a structured format.
+
+Invoke the LLM with the prompt template to generate the summaries.
+
+Store the summarized output back into the state dictionary.
+
+With this, the summarize node is complete. The output stored in state['summary'] can now be passed to the save_results node, which will format and store the summaries in markdown or PDF format for user consumption.
+
+**F) Save Results Node Functionality Implementation**
+
+Now that we have successfully implemented fetch_news and summarize nodes, the final step is to save the summarized results. This is a straightforward process: we simply take the summarized content from the state dictionary and save it into a file, which can later be displayed on the UI. The key idea here is to capture the frequency (daily, weekly, or monthly) and create a file name accordingly, such as "daily_summary.md" or "weekly_summary.md", inside an I_news folder. The implementation looks like this:
+
+def save_result(self, state: dict):
+    """
+    Saves the summarized news into a markdown file based on the frequency.
+    """
+    frequency = state['frequency']  # daily, weekly, monthly
+    summary_content = state['summary']  # summarized news
+    file_path = f"I_news/{frequency}_summary.md"
+    # Ensure the folder exists
+    import os
+    os.makedirs("I_news", exist_ok=True)
+    # Write summary to the file
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(f"{frequency.capitalize()} Summary\n\n")
+        f.write(summary_content)
+    # Store the file path in state for reference
+    state['file_name'] = file_path
+    return state
+
+
+With this, the save_result node stores the summarized content in markdown format, ready for display or further processing. We are maintaining multiple state variables, including "news_data", "summary", and "file_name", all stored in the state dictionary for easy access across nodes.
+
+Once all the nodes are defined, the next step is integration with the graph builder. First, we import the AI_News_Node class in the graph builder file:
+
+from c.graph_agentic_i.nodes.i_news_node import AI_News_Node
+
+
+Then, we initialize an object of this class by providing the required LLM and client:
+
+i_news_node = AI_News_Node(llm=self.llm)
+
+
+We can now sequentially call the three main node functions—fetch_news, summarize, and save_result—to complete the workflow:
+
+state = i_news_node.fetch_news(state)
+state = i_news_node.summarize(state)
+state = i_news_node.save_result(state)
+
+
+Finally, in the graph builder, we add a condition to trigger this workflow if the selected use case is "I_news":
+
+if self.selected_use_case == "I_news":
+    self.i_news_builder_graph()
+
+
+In the main.py file, we integrate this workflow with Streamlit to display the results on the frontend. Using a simple markdown display, we read the saved summary file and show it to the user:
+
+elif self.selected_use_case == "I_news":
+    user_message = self.user_message
+    # Invoke the graph with the user message
+    state = self.graph.invoke(message=user_message)
+    # Display the markdown summary
+    file_path = state['file_name']
+    with open(file_path, "r", encoding="utf-8") as f:
+        summary_content = f.read()
+    import streamlit as st
+    st.markdown(summary_content)
+
+
+This ensures that after fetching, summarizing, and saving the news, the content is automatically displayed in the frontend UI. At this point, the entire AI News Summarizer workflow is complete: the graph builder is ready, the nodes are implemented, and the Streamlit UI displays the summary dynamically.
+
+With everything integrated, the next step is to run a full demo to verify that selecting a frequency like daily, weekly, or monthly triggers the complete flow from fetching news to displaying the summary.
+
+**G) Running The Entire AINEWS Agentic Workflow**
+
+Now finally, let’s see whether everything is working fine with our AI News Summarizer. I already created the I_news folder, and we are going to test if the summary workflow works properly. Even if we face errors, we will handle them live so that everyone can understand the process.
+
+We start by running our Streamlit app:
+
+streamlit run app.py
+
+
+Once the app is running, we input our Grok API key and select the model. Then, we enter the I_news section and provide the API key there as well. Next, we choose a time frame such as daily, weekly, or monthly.
+
+Upon clicking Fetch Latest AI News, initially nothing happened. This indicated that the button click wasn’t triggering the workflow. To fix this, we introduced a session state variable to track the button click:
+
+st.session_state['fetch_button_clicked'] = True
+
+
+In main.py, we updated the condition to handle both user messages and button clicks. The user message now receives the time frame information when the fetch button is clicked:
+
+if st.session_state['fetch_button_clicked']:
+    user_message = st.session_state['time_frame']  # daily, weekly, or monthly
+
+
+Next, we had to initialize session state variables to avoid runtime errors:
+
+st.session_state['time_frame'] = ""
+st.session_state['fetch_button_clicked'] = False
+
+
+After restarting the app, clicking the fetch button successfully triggered the workflow. The system began fetching and summarizing news.
+
+Initially, there was an error regarding "No such file or directory: I_news/weekly_summary.md". This was caused by saving the markdown file in the wrong folder. To fix this, we ensured the I_news folder is created in the workspace root, not inside the source folder:
+
+os.makedirs("I_news", exist_ok=True)
+file_path = f"I_news/{frequency}_summary.md"
+
+
+With this fix, the workflow worked perfectly. Selecting weekly generated the markdown summary file, which we could read and display in the Streamlit app. Similarly, selecting daily or monthly also generated the respective summaries.
+
+You can view the generated markdown files directly in the I_news folder. Opening the files in preview mode shows nicely formatted summaries, which can also be converted to PDF or other formats if needed.
+
+# Display markdown in Streamlit
+with open(file_path, "r", encoding="utf-8") as f:
+    summary_content = f.read()
+st.markdown(summary_content)
+
+
+This completes the full workflow of the AI News Summarizer:
+
+Fetch news from the API based on user-selected time frame.
+
+Summarize news using the LLM and prompt template.
+
+Save results in markdown files.
+
+Display summaries in the Streamlit frontend.
+
+The system now supports daily, weekly, and monthly news summaries, with all errors addressed in real time. You can also customize the prompt templates to change the summary formatting.
+
+This concludes the AI News project. In the next project, we’ll explore building something more complex using FastAPI, creating a new use case step by step.
+
+Thank you for watching, and see you in the next video!
+
+# **XVIII) End To End Blog Generation Agentic AI App**
+
+**A) Introduction And Project Demo**
+
+Hello guys! I’m super excited to start our new end-to-end project, which is about blog generation using AI applications with a graph-based approach. This project is very close to my heart because it solves a problem I personally faced. On my website, christian.in, there’s a blog section, and I wanted a system where whenever I upload a YouTube video, a corresponding blog is automatically generated from that video transcript. Initially, I thought this would require a dedicated content writer and a review process. But instead, I developed a generic AI application that automates this workflow entirely.
+
+The goal of this project is to create a blog generation system capable of generating blogs based on a topic name, topic and language, or even a YouTube video transcript. For example, if you provide the transcript of a video, the system should automatically generate a structured blog from it. We will focus on two main use cases initially.
+
+The first use case is basic blog generation. Here, the user provides a topic, e.g., "Generic AI Application". The system will then create a title, generate content, and optionally add a conclusion. For instance, the AI can generate a title like "Rise of Agentic AI: How AI is Revolutionizing the Future" and produce the content accordingly. The Python logic for title generation could be represented like this: "title = ai_agent.generate_title(topic)", and content generation can be executed with "content = ai_agent.generate_content(title)".
+
+The second use case is blog generation in different languages. After generating the initial English content, we can translate it into other languages such as Hindi, French, or any language requested. For example, "translated_content = ai_agent.translate(content, language='Hindi')" allows the system to generate multilingual blogs seamlessly. This modular approach ensures that each functionality—title creation, content generation, and translation—is isolated and can be maintained independently.
+
+An exciting aspect of this project is the integration with Graph Studio for monitoring and execution. Within Graph Studio, every step—like title creation and content generation—is logged and monitored. For example, when I submit a topic "Agentic AI", the system generates a title and content, and I can monitor the execution. Each call to the AI, such as "title_response = chat_grok.call(prompt_title)" and "content_response = chat_grok.call(prompt_content)", is tracked, along with token usage. This gives us complete visibility into how the blog is being generated.
+
+The project implementation is fully modular. We will create multiple nodes representing different parts of the workflow, including root nodes, conditional edges, and nodes for each processing step. These nodes interact with each other to build the complete blog generation pipeline. For example, we might define a node in Python as: "title_node = Node(name='Title Creation', func=generate_title)" and "content_node = Node(name='Content Generation', func=generate_content)". Conditional edges can then connect them based on the workflow logic.
+
+We will not focus heavily on the front end in this project. Instead, we will create APIs using FastAPI to handle blog generation requests. For instance, we can define an endpoint as: "@app.post('/generate_blog/') async def generate_blog(request: BlogRequest): return generate_blog_pipeline(request)". This ensures that our backend logic is reusable, scalable, and can integrate with other applications.
+
+Finally, to manage dependencies efficiently, we will use the UV package manager instead of Conda. This allows us to demonstrate different ways of managing Python packages, keeping the environment lightweight and flexible.
+
+In summary, this project covers title creation, content generation, multilingual support, workflow monitoring using Graph Studio, modular pipeline design, and FastAPI integration. By the end of the implementation, the system will automatically generate blogs from topics or video transcripts, translate them if needed, and provide full monitoring for transparency and debugging. This project lays a solid foundation for building AI-driven content automation systems.
+
+**B) Building Project Structure Using UV Package**
+
+Hello guys! Now let’s go ahead and execute our end-to-end project. In this video, we will focus on setting up the project structure using the UV package manager. First, I created a new folder on my E drive named "blogAgentic" and opened it in VS Code. The first task is to create a Python environment, but this time, instead of Conda, we will use UV, which is a fast, modern package manager written in Rust. If you haven’t installed UV yet, you can install it via pip with "pip install uv" or follow the platform-specific instructions for Windows, Mac, or Linux.
+
+Once UV is installed, we initialize the project workspace by executing "uv init" in the terminal. This command creates a new project structure with default files, including "pyproject.toml" where basic information like Python version (3.13), project version (0.10), and description can be defined. At this point, our workspace is initialized and ready to create a virtual environment.
+
+To create a virtual environment using UV, we can execute "uv venv <env_name>". For example, "uv venv blogAgenticEnv" will create an environment named blogAgenticEnv inside the project folder. After creation, we activate it by pointing to the environment path. Once activated, any Python file we run will execute within this environment. This is much faster and simpler compared to creating environments with Conda.
+
+The next step is to create a "requirements.txt" file to list all the libraries needed for our project. To install individual packages, UV provides a very simple command: "uv add <package_name>". For example, "uv add fastapi" or "uv add langchain" will install the package and also automatically update "pyproject.toml" with the package version. This makes dependency management seamless.
+
+For multiple packages, we can list them all in the "requirements.txt" file, for instance:
+
+fastapi
+uvicorn
+watchdog
+langchain
+inmemory
+chadgrok
+
+
+Once the file is ready, all packages can be installed with "uv add -r requirements.txt", similar to "pip install -r requirements.txt". This ensures all libraries are installed quickly and properly tracked in "pyproject.toml". The installed packages include essential libraries for our project like FastAPI, Uvicorn for serving APIs, LangChain, Watchdog, InMemory, and ChadGrok for AI-driven functionalities.
+
+After setting up the environment and installing the required packages, I created a folder named "source" to hold all project implementation files. This folder will contain all the code for blog generation, graph builder, and node implementation that we will build in the upcoming steps. At this point, our basic project structure is ready: the environment is activated, required libraries are installed, and the workspace is organized for modular development.
+
+Thanks to UV, this setup process is extremely fast and efficient, and it helps manage dependencies and environments effortlessly. In the next video, we will start coding the actual blog generation use case, including building the graph nodes and implementing the complete AI workflow for content creation.
+
+This concludes the initial project setup and environment creation. Everything is now ready to proceed with the coding and AI logic for automated blog generation.
+
+**C) Blog Generation Grpah Builder And State Implementation**
+
+Hello guys! We are going to continue our discussion on the end-to-end blog generation project. In the previous video, we successfully created the virtual environment using UV and installed all the required libraries. Now, we will continue by setting up the project structure and creating the necessary folders and files inside the source folder, which will hold all our implementation code.
+
+Inside the source folder, I first created an __init__.py file to make it a proper Python package. Then, I created several subfolders to organize the code: lmms for language models, graphs for graph-related code, nodes for node logic, and states for defining structured state objects. Each folder also contains an __init__.py file to allow easy imports across the project. This modular structure helps maintain clean and reusable code.
+
+Next, I created a .env file to store all the important API keys. For this project, there are three keys: PROJECT_NAME (set as "blogAgentic"), API_KEY for platform monitoring, and another API_KEY for the specific LLM model usage. These keys are required for initializing and monitoring the AI models and the workflow in the platform.
+
+Inside the lmms folder, I created a file grok_lm.py. Here, I defined a class GrokLM to load the Grok LLM with environment variables. The main function is get_lm() which retrieves the API key from os.environ and initializes the model using:
+
+import os
+from chadgrok import ChadGrok
+
+class GrokLM:
+    def __init__(self):
+        self.grok_api_key = os.getenv("GROK_API_KEY")
+    def get_lm(self):
+        try:
+            lm = ChadGrok(api_key=self.grok_api_key, model="llama-3.1")
+            return lm
+        except Exception as e:
+            raise ValueError(f"Error occurred: {e}")
+
+
+If you want to use OpenAI instead of Grok, you can use the same structure but replace GROK_API_KEY with your OpenAI API key.
+
+Next, we move to the graphs folder to implement the graph builder. I created a file graph_builder.py and defined a class GraphBuilder to construct the workflow graph. The class constructor initializes the LLM and the state graph, which will later use BlockState from the states folder:
+
+from langgraph.graph import StateGraph, Start, End
+from src.states.block_state import BlockState
+
+class GraphBuilder:
+    def __init__(self, lm):
+        self.lm = lm
+        self.graph = StateGraph(start=Start(), end=End(), state=BlockState)
+
+
+The BlockState class, defined in states/block_state.py, uses Pydantic to provide structured output for the blog. It contains the following fields:
+
+from pydantic import BaseModel, Field
+from typing import Dict
+
+class Blog(BaseModel):
+    title: str = Field(..., description="Title of the blog post")
+    content: str = Field(..., description="Main content of the blog post")
+
+class BlockState(BaseModel):
+    topic: str
+    blog: Blog
+    language: str = Field(..., description="Language for blog generation")
+
+
+The GraphBuilder class then defines a method build_topic_graph() which sets up the nodes and edges. Here, we have two main nodes: title_creation and content_generation. The edges define the flow from start → title creation → content generation → end:
+
+def build_topic_graph(self):
+    self.graph.add_node("title_creation")
+    self.graph.add_node("content_generation")
+    self.graph.add_edge("start", "title_creation")
+    self.graph.add_edge("title_creation", "content_generation")
+    self.graph.add_edge("content_generation", "end")
+    return self.graph
+
+
+At this stage, the graph structure is complete, but the node functionalities—how the title and content will be generated using the LLM—will be implemented in the nodes folder in the upcoming videos.
+
+To summarize, in this step, we have set up the modular project structure, created LLM integration in lmms, defined the structured blog state in states, and built the graph skeleton in graphs. This prepares us for the next step, where we will implement the title creation and content generation nodes and integrate them with the graph workflow.
+
+This concludes the graph and state setup for the blog generation project. In the next video, we will focus on implementing the nodes and connecting the entire AI workflow.
+
+**D) Blog Generation Node Implementation Definition**
+
+Hello guys! Today we are continuing our end-to-end blog generation project. In the previous video, we had already built the entire graph structure. Now it’s time to implement the node logic, which is the functional part of the graph. In this project, there are two main node implementations: title creation and content generation.
+
+First, we go to the nodes folder and create a new file called "blog_node.py". Inside this file, we define a class "BlogNode" which will contain all the logic for our blog nodes. The class begins with a docstring describing it: "Class to represent the blog node". The constructor is defined as "def __init__(self, lm):" where lm is the language model that we will use in all node operations. Inside the constructor, we simply initialize the LLM with "self.lm = lm".
+
+The first functionality we implement is title creation. We define a method "def title_creation(self, state: BlockState):" where state is of type "BlockState". This type is imported at the top of the file with "from src.states.block_state import BlockState". Inside this method, we first check if the topic exists in the state dictionary by writing "if 'topic' in state and state['topic']:". If a topic exists, we define a prompt for the LLM to generate a creative, SEO-friendly blog title using markdown formatting. The prompt can be written as:
+
+prompt = (
+    f"You are an expert content writer.\n"
+    f"Use markdown formatting.\n"
+    f"Generate a creative and SEO-friendly blog title for the topic: {state['topic']}"
+)
+
+
+Next, we send this prompt to the LLM and get a response with "response = self.lm.invoke(prompt)". We then store the generated title back into the block state using "state.blog.title = response.content", and return it in a structured format: "return {'block': {'title': response.content}}". This ensures that the generated title is saved in the state and can be used by downstream nodes.
+
+Once the title creation node is done, we move on to the content generation node. Inside the same class, we define "def content_generation(self, state: BlockState):" which again takes the state object as input. We perform a similar check for the topic with "if 'topic' in state and state['topic']:". The prompt for content generation instructs the LLM to produce detailed blog content with a structured breakdown:
+
+prompt = (
+    f"You are an expert blog writer.\n"
+    f"Use markdown formatting.\n"
+    f"Generate a detailed block content with a structured breakdown "
+    f"for the topic: {state['topic']}"
+)
+
+
+The response is then obtained by invoking the LLM "response = self.lm.invoke(prompt)", and the content is stored in the state with "state.blog.content = response.content". We also return it in a structured format: "return {'block': {'content': response.content}}". This ensures that both the blog title and content are available in the state for the graph to use.
+
+In the graph builder, we import and initialize this node with "from src.nodes.blog_node import BlogNode" and "blog_node_object = BlogNode(lm=self.lm)". The methods "title_creation" and "content_generation" are then called within the graph execution sequence. For example, we can call "blog_node_object.title_creation(state)" to generate the title and "blog_node_object.content_generation(state)" to generate the content. These outputs are stored in the BlockState object so that the LLM provides a structured, Pydantic-validated output.
+
+Once both nodes are implemented, we can execute the entire graph from start to finish. The title creation output flows into the content generation node, ensuring that the content is coherent and relevant to the topic. The graph itself is constructed using the "build_topic_graph" function, which organizes the execution sequence of nodes and ensures that the state is updated at each step.
+
+Finally, after the node implementations are ready, we create a new file called "app.py" to implement FastAPI. This will allow us to expose the functionality as an API, so that we can call the graph programmatically without needing a frontend. By sending a topic through the API, the backend can generate both the blog title and the detailed content and return it in JSON format.
+
+To summarize, in this phase we have:
+
+Created the "BlogNode" class inside "blog_node.py".
+
+Implemented two methods: "title_creation" and "content_generation".
+
+Integrated these methods with the graph so that outputs flow from title to content.
+
+Stored the outputs in the BlockState object to maintain a structured format.
+
+Prepared for FastAPI integration to expose the functionality as an API.
+
+This completes the node implementation phase. In the next step, we will implement FastAPI endpoints in "app.py" to run the blog generation workflow through API calls.
+
+**E) Creating Blog Generating API Using FAST API**
+
+Hello guys! In the previous video, we completed both the Graph Builder and the node creation. In this video, we focus on creating a FastAPI application so that the blog generation workflow can be executed via an API request. We are not building a frontend at this stage; our goal is to call the functionality directly using APIs.
+
+First, we import the necessary libraries. We start with "import uvicorn" because we will use it to run the FastAPI server. From FastAPI, we import "FastAPI" and "Request" with "from fastapi import FastAPI, Request". We also import our graph builder with "from src.graph.graph_builder import GraphBuilder" and the language model with "from src.lms.graph_lm import LM". Additional imports include "import os" and "from dotenv import load_dotenv" to manage environment variables.
+
+Next, we initialize the FastAPI app with "app = FastAPI()". We also set up our LangSmith API key by fetching it from environment variables:
+
+os.environ["LANGSMITH_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
+
+
+This ensures that every request can access the LLM securely. The app.py file is located in the root workspace folder.
+
+Now we define our API endpoint. Using the FastAPI decorator, we create a POST endpoint with "@app.post('/blocks')". The corresponding asynchronous function is "async def create_blocks(request: Request):". Inside this function, we retrieve the POSTed JSON data using "data = await request.json()". This JSON contains the topic information, for example: {"topic": "Agentic AI"}. We can access the topic using "topic = data.get('topic', '')".
+
+Next, we initialize the LM object with:
+
+grok_lm = LM()
+lm = grok_lm.get_lm()
+
+
+This loads the Llama model (llama 3.18) configured in our LM class. Then, we create a graph builder object:
+
+graph_builder = GraphBuilder(lm=lm)
+
+
+If a topic is provided, we call the graph setup function to build the topic graph. We define the use case as "topic" and call:
+
+graph_builder.setup_graph(use_case=use_case)
+
+
+Inside setup_graph, if the use case is "topic", it calls the "build_topic_graph" function, which executes the title creation and content generation nodes sequentially. The final state is returned by invoking the graph:
+
+data = graph_builder.graph.invoke({"topic": topic})
+
+
+Here, "data" contains the full output including the title and content stored in the structured state object.
+
+Finally, we run the FastAPI app using Uvicorn. In app.py we write:
+
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+
+Here, "0.0.0.0" ensures the server runs on localhost (127.0.0.1) and port 8000. The reload=True flag allows the server to restart automatically when code changes.
+
+To test the API, we use Postman. The API URL is "http://127.0.0.1:8000/blocks" and we select a POST request. In the body, we select "raw" and "JSON" type, and send data like:
+
+{
+  "topic": "Agentic AI"
+}
+
+
+Clicking "Send" will trigger the FastAPI endpoint. The graph executes, and we get a JSON response containing the topic, the generated title, and the content in markdown format. For example, the response may look like:
+
+{
+  "topic": "Agentic AI",
+  "block": {
+    "title": "Agentic AI Revolutionizes Modern Workflows",
+    "content": "## Introduction\nAgentic AI is ..."
+  }
+}
+
+
+We can test multiple topics, such as "Generic AI versus AI agent", and the API returns the corresponding title and content, complete with markdown formatting and links if included. This output can then be sent to a frontend or further processed to generate PDFs, markdown files, or other formats.
+
+In summary, we have:
+
+Created the FastAPI app in "app.py".
+
+Configured environment variables for the LLM API.
+
+Defined a POST endpoint /blocks that accepts a JSON with a topic.
+
+Initialized the LLM and Graph Builder objects.
+
+Built and invoked the graph using the topic to generate structured output.
+
+Returned the title and content in JSON format.
+
+Tested the API successfully using Postman.
+
+This concludes the API implementation phase of the blog generation project. In the next steps, we can expand this by adding more functionalities like language translation, additional blog formatting, and more complex use cases.
+
+**F) Integrating Langgraph Studion For Debugging**
+
+Hello guys! In our previous video, we implemented our end-to-end block generation Agentic AI application. We also created the FastAPI endpoint /blocks and tested it successfully. For example, if we run "python app.py" and provide a topic like "ethical AI" in Postman, we get a response with the generated block content, confirming that the API works correctly.
+
+Now, if we go to LangSmith, there is a feature called Deployments, which provides an amazing tool called LangGraph Studio. This tool allows you to debug and monitor your graph-based applications in a much easier and efficient way. Monitoring is a key feature here, as it allows you to step through the graph execution, check intermediate outputs, and even pause execution for human feedback. In this video, we will set up Graph Studio and demonstrate how to run the application directly from our local machine.
+
+First, we create a file called "langgraph.json" in the project root. This JSON file is the configuration that allows LangGraph Studio to run our application. The first key in this JSON is "dependencies", where we specify "." to indicate the current working directory. The second key is "graphs", where we define the graph we want to execute. For example, we can write: "name": "blog_generation_agent" and "path": "src/graph/graph_builder.py" to point to our graph builder file, and "variable": "graph" to reference the compiled graph object. Finally, we add an "env" key pointing to our .env file to provide API keys and other environment variables.
+
+In the "graph_builder.py" file, we initialize the language model and build the graph as follows: "lm = LM().get_lm()" and "builder = GraphBuilder(lm=lm)". Then we call "builder.build_topic_graph()" to construct the graph nodes, including title creation and content generation. To make the graph executable, we compile it with "graph = builder.build_topic_graph().compile()". This compiled graph variable is what we reference in "langgraph.json" so that LangGraph Studio knows which object to run. This is similar to how FastAPI uses "app:app" when running "uvicorn app:app".
+
+Before running in Graph Studio, we ensure that the FastAPI server is running locally by executing "python app.py". The server runs on port 8000, and we can confirm functionality by sending requests through Postman. Once verified, we can run the graph locally in Graph Studio using the LangGraph CLI: "langgraaf dev". This opens Graph Studio in the cloud or in a local window, showing the entire graph structure, including title creation and content generation nodes.
+
+In Graph Studio, we can provide input, for example "Agentic AI", and click submit. Step by step, the title is created, followed by content generation. Hovering over any node shows the inputs and outputs for that node. If desired, we can interrupt execution for human feedback. For instance, we can pause after title creation, modify the input, and then continue to generate the content. This human feedback feature is very useful for debugging and monitoring complex workflows. For example, inputting "Future of AI" first generates the topic, then the title, and pauses before content generation, allowing us to confirm before proceeding.
+
+We can try multiple inputs in Graph Studio, such as "AI Agents vs Agentic AI", and see the generated title and content with alternate options for flexibility. The tool clearly shows the outputs in fields such as "title", "content", and "topic". All intermediate outputs, SEO considerations, and target keywords are visible, making debugging transparent and intuitive. The key thing to remember is that the FastAPI server must run parallelly while executing "langgraaf dev" so that the graph can interact with the API during runtime.
+
+Finally, this setup allows us to debug, monitor, and test our block generation Agentic AI application effectively. In the next project, we plan to extend this workflow to multi-language blog generation, where the inputs will include both "topic" and "current_language", allowing blogs to be generated in languages like Hindi, French, or German. This showcases the flexibility and power of combining FastAPI, LangSmith LMs, Graph Builder, and LangGraph Studio to create a fully debuggable and monitorable AI application.
+
+That’s it for this video. I hope you now understand how to set up LangGraph Studio, configure "langgraph.json", initialize your graph in "graph_builder.py", and debug your application step by step. See you in the next video!
+
+**G) Blog Generation And Translation With Language**
+
+Hello guys! I hope everybody has understood our end-to-end block generation implementation using Agentic AI, where we provided a topic as input and generated a block. In this new project, we aim to extend this functionality to multi-language block generation. The language will be passed as part of the POST request, and based on the input, the generated content will be translated into either Hindi or French. Of course, other languages can also be used, but for demonstration, we are considering these two. The overall graph structure remains similar: starting from "start", followed by "title creation", and "content generation". During content generation, the graph will take a conditional path depending on the target language to perform the required translation.
+
+To implement this, we need to modify our graph builder to include the language input and add conditional nodes for translation. The development steps involve updating the POST request handler to accept a "language" parameter, integrating a translation step in the graph, and ensuring that the final output reflects the selected language. Once the graph is built, we can test it in LangGraph Studio, which allows real-time monitoring, observing the flow of block generation, and validating that each step—from title creation to content generation and language translation—is executed correctly.
+
+Additionally, we are already tracking execution in LangSmith, which enables debugging and request tracing across all nodes and any language models used. For example, in the previous project named "Block Generator", LangSmith tracked the request from title creation all the way through content generation, allowing us to inspect each step and intermediate output. This was made possible because in "app.py", we ensure that the API key is assigned as an environment variable, allowing all requests to be tracked and monitored in LangSmith.
+
+In the next video, we will start implementing the multi-language block generation platform, adding translation logic to our graph and testing it both locally and in LangGraph Studio. This will allow us to generate blogs or content blocks in different languages dynamically based on the input. I hope you found this explanation helpful. That’s it for this video—I’ll see you in the next one. Thank you and take care.
+
+**H) Building Blog Generation And Translation Graph Builder**
+
+So guys, now let's proceed with the implementation of block generation in different languages. We will continue with the same project structure and update the code accordingly. The first step is to open our graph builder. Previously, our input only required a "topic", but now we need to provide both "topic" and "language". To reflect this, we update our request JSON file (request.json) to include the language parameter like this: "topic": "AI agents", "language": "Hindi". If we pass "Hindi", the block should be generated in Hindi; if "French" is passed, the block should be generated in French.
+
+Next, in the graph builder, we already have the build_topic_graph method, but now we will create a new method called "build_language_graph" using: "def build_language_graph(self):" with a docstring explaining, "Building a graph for block generation with inputs topic and language". Inside this method, we start by adding nodes to the graph using "self.graph.add_node()". We reuse the previous nodes for "title_creation" and "content_generator", but we also add two additional nodes: "Hindi_translation" and "French_translation". These nodes will handle language-specific translations, though the exact node functionality will be implemented later. For example, adding a Hindi translation node can be written as: "self.graph.add_node('Hindi_translation')" and for French: "self.graph.add_node('French_translation')".
+
+Once the nodes are created, we add the edges to define the flow. The edges from start to title creation and title creation to content generation remain the same. After content generation, we add a "route" node: "self.graph.add_node('route')", which will determine the conditional path for translation. Then, we define conditional edges using "self.graph.add_conditional_edges()". The conditional edge function will take the route node as input and redirect to either Hindi or French translation nodes based on the language input. For instance, "if input_language == 'Hindi': go to Hindi_translation node; else: go to French_translation node". Finally, we add edges from both Hindi and French translation nodes to the "end" node using: "self.graph.add_edge('Hindi_translation', 'end')" and "self.graph.add_edge('French_translation', 'end')".
+
+At this stage, the graph structure is complete: from start → title creation → content generation → route → Hindi/French translation → end. The final step in the method is to return the graph: "return self.graph". Later, in our main implementation, we can check if the input contains a language parameter. If it does, instead of calling build_topic_graph(), we call build_language_graph(). This ensures that the input language is handled correctly and the block generation follows the proper path in the graph.
+
+The only remaining tasks are the implementation of the root node and the translation node functionalities for Hindi and French. Once those are implemented, the graph will be fully functional for multi-language block generation. In the next video, we will focus on defining the functionality for the Hindi translation, French translation, and the root node. For now, the graph structure, nodes, edges, and conditional routing for multi-language support have been fully set up. I hope this explanation gives a clear picture of the implementation process. Thank you, and I’ll see you in the next video.
+
+**I) Blog Generation And Translation Node Implementation**
+
+Now we are going to proceed with the node implementation for multi-language block generation. Specifically, we need to implement functions that handle Hindi translation, French translation, and a root node function.
+
+First, we open the nodes folder and navigate to the blog_node.py file. Here, we define a new method called translation. This function will take two parameters: self and state, where state represents the block state. We also add a docstring: "Translate the content to the specified language".
+
+Inside the translation function, we create a prompt called translation_prompt. This prompt instructs the system to translate content while maintaining the original tone, style, and formatting, and to adapt cultural references and idioms appropriately. The original content comes from the block state.
+
+block_content = state.block
+translation_prompt = """
+Translate the following content into {current_language}.
+Maintain the original tone, style, and formatting.
+Adapt cultural references and idioms appropriately.
+Content: {block_content}
+"""
+
+
+Next, we define a human message for the LLM to process, using:
+
+from langchain_code.messages import HumanMessage, SystemMessage
+
+message = HumanMessage(
+    content=translation_prompt.format(
+        current_language=state.current_language,
+        block_content=block_content
+    )
+)
+
+
+We then invoke the translation using the LLM with structured output, ensuring that the output follows the Blog class structure with title and content fields:
+
+from shark.state.blog_state import Blog
+
+translated_content = self.lm.with_structured_output(Blog).invoke([message])
+
+
+This allows the translation function to dynamically handle any language specified in the input state.
+
+In the graph builder, we use the translation function for the Hindi and French translation nodes by passing a lambda function with the current language parameter:
+
+# Hindi translation
+lambda state: self.blog_node_obj.translation(state, current_language="Hindi")
+
+# French translation
+lambda state: self.blog_node_obj.translation(state, current_language="French")
+
+
+Here, the current language is passed through the state, which ensures that the translation function knows which language to convert the content into.
+
+Next, we define the root node function in blog_node.py. The root function simply reads the current language from the state and returns it:
+
+def root(self, state):
+    return state.current_language
+
+
+This root node is responsible for setting up the language context before the conditional routing happens.
+
+The route decision function determines which translation node to call based on the current_language in the state:
+
+def route_decision(self, state):
+    if state.current_language.lower() == "hindi":
+        return "Hindi_translation"
+    elif state.current_language.lower() == "french":
+        return "French_translation"
+    else:
+        return state.current_language
+
+
+In the graph builder, the route decision ensures that the correct translation node is invoked:
+
+# Conditional routing
+if route_decision_output == "Hindi_translation":
+    call Hindi translation node
+elif route_decision_output == "French_translation":
+    call French translation node
+
+
+Finally, the edges from Hindi or French translation nodes go to the end node, completing the graph flow.
+
+In the application (app.py), we now need to handle both topic and language from the request JSON:
+
+language = data.get("language")
+if topic and language:
+    use_case = "language"
+    graph = builder.setup_graph(use_case)
+elif topic:
+    # fallback to topic-only graph
+    graph = builder.setup_graph("topic")
+
+
+We also ensure that the current_language field is set in the state:
+
+current_language = language.lower()
+
+
+This guarantees that the translation function and route decision can correctly pick the language for translation.
+
+Recap of key functions:
+
+Translation function: Translates content based on current_language and block content.
+
+Root function: Reads the current language from the state.
+
+Route decision: Determines which translation node to call (Hindi or French).
+
+Graph builder: Passes the correct lambda function for translation nodes.
+
+App.py changes: Handles both topic and language input, sets current_language in the state.
+
+Once this is set up, you can run your app, send a POST request with topic and language (e.g., French), and see the content generated in the specified language.
+
+**J) Testing In Postman And Langgraph Studio**
+
+Hello guys! Now that we have integrated everything into the code, it’s time to test our multi-language block generation project. The goal is that when you provide a language like Hindi or French, the blog should be translated accordingly. First, we need to start our FastAPI application. Open the command prompt and run python app.py. This starts the server on port 8000, ready to receive requests.
+
+Before testing in LangGraph Studio, we must ensure the Graph Builder is updated to support languages. Previously, we were using the function build_topic_graph, but now we should use build_language_graph so that the graph can handle both topic input and the requested language. Once this is updated, we can start LangGraph Studio by running langgraph dev in the command prompt. This opens the studio interface where we can visualize our graph, including nodes for title creation, content generation, root, and language-specific translation nodes like Hindi and French, along with the conditional routing edges that connect them.
+
+Next, we can test our API in Postman. For example, to generate a French blog, we provide a JSON input like {"topic": "Ethical AI", "language": "French"} and send a POST request. The server will first generate the blog content in English using the content generator node and then translate it to French using the French translation node, which internally uses the translation function in our blog_node.py. The translation function is defined as def translation(self, state, **kwargs): and takes the block state along with a current_language parameter. Inside this function, we get the original blog content via block_content = state.blog.content and create a message prompt like translation_prompt = "Translate the following content into {current_language} maintaining tone, style, formatting, and culture: {block_content}". This prompt is sent to the LLM using self.lm.with_structured_output(blog).invoke([translation_prompt]) to produce the translated blog in the specified language. Similarly, for Hindi, we send {"topic": "Genetic AI", "language": "Hindi"} in Postman, and the content is translated to Hindi.
+
+The routing in our graph is handled by a root node and a route decision function. The root node is implemented as def root(self, state): return state.current_language, which ensures that the current language is set in the block state. The route_decision function looks at state.current_language and returns either 'Hindi' or 'French', which determines which translation node to invoke. After the translation node completes, the flow moves to the end node. This setup is modular, so if you want to add more languages like German or Spanish, you simply create new translation nodes, reuse the generic translation function, and update the route decision logic.
+
+Finally, you can also test the flow visually in LangGraph Studio to see each node execute step by step. This is particularly useful for debugging or verifying that the routing works correctly. The project is fully modular, uses FastAPI for API integration, supports multiple languages, and can easily be extended. With this setup, you can test topics in any language, debug in LangGraph Studio, and even add additional languages as needed.
+
+# **XIX) Model Context Protocol**
+
+**A) Demo of MCP with Claude Desktop**
+
+Hello guys! Today, we are going to continue our discussion on Model Context Protocol (MCP). In our previous video, we discussed how communication happens between the MCP host, MCP server, and the language model (LM). We saw that as soon as input is received at the MCP host via the MCP client, it communicates with the MCP server, and then the context reaches the LM. In this video, I will show you some practical examples of MCP host, MCP client, and server interactions, along with step-by-step integration.
+
+First, let’s talk about an MCP host. An MCP host can be any interface, including an IDE, a cursor, or an application. For this demonstration, we’ll use Cloudy Desktop, which is a host introduced by Anthropic. Cloudy Desktop internally creates an MCP client to communicate with multiple MCP servers. The architecture is simple: the host with MCP clients uses the MCP protocol to communicate with MCP servers, which can connect to remote APIs, databases, or external services.
+
+To get started, you need to download Cloudy Desktop. For Windows, download the .exe file, and for Mac, use the respective installer. After downloading, install it by clicking Next until the installation completes. Once installed, Cloudy Desktop will look like a chatbot assistant where you can interact with multiple models like Cloudy Sonnet 3.7, Opus 2, Sonnet 4, and more. You can also access external integrations such as DuckDuckGo Search or Airbnb through MCP servers.
+
+Now, let’s focus on configuring MCP servers. Cloudy Desktop has a JSON configuration file named cloudy_desktop_config.json, which specifies which MCP servers are connected. For example, to integrate Airbnb MCP server, the JSON might look like this:
+
+{
+    "mcp_servers": {
+        "airbnb": {
+            "command": "pnp",
+            "args": ["airbnb-mcp-server"]
+        }
+    }
+}
+
+
+You can edit this file using Notepad or any text editor. After adding the configuration, you need to restart Cloudy Desktop to reload the MCP servers. It’s important to close the app fully from Task Manager to ensure the changes take effect. Once restarted, go to File > Settings > Developer to verify that the Airbnb MCP server is running.
+
+After integration, you can test the Airbnb MCP server. For example, you can search for listings using:
+
+Hey, list all the best hotels in San Jose, California.
+
+
+Cloudy Desktop will prompt: "Cloudy would like to use an external integration." You can click Allow once, and it will fetch listings directly from Airbnb. The response includes room names, links, Wi-Fi availability, ratings, and more—all handled automatically by the MCP protocol.
+
+Similarly, you can integrate DuckDuckGo Search MCP server by adding it to the JSON config:
+
+{
+    "mcp_servers": {
+        "duckduckgo": {
+            "command": "np",
+            "args": ["-y", "duckduckgo-mcp-server"]
+        }
+    }
+}
+
+
+After saving the file and restarting Cloudy Desktop, you can perform web searches using:
+
+Hey, provide me the latest news from DuckDuckGo web search.
+
+
+Cloudy Desktop will fetch the information from DuckDuckGo, summarize it, and present it in the chat interface. You can also search for technical topics, like asking:
+
+Tell me what is Model Context Protocol from DuckDuckGo web search.
+
+
+The MCP server fetches the relevant information and sends it back through the MCP client.
+
+The beauty of this setup is its modularity. To integrate any new MCP server, you just need to add its configuration in cloudy_desktop_config.json, restart the host, and it’s ready to use. There is also a website called Symmetry where you can find multiple MCP servers for different services, which will be discussed in upcoming videos.
+
+In summary, MCP allows hosts like Cloudy Desktop to communicate seamlessly with external servers using a standard protocol. Integration is as simple as editing the JSON configuration file, restarting the host, and testing queries. We demonstrated Airbnb and DuckDuckGo MCP servers, and the process can be repeated for any other MCP server, providing a powerful and extensible architecture.
+
+**B) Cursor IDE Installation**
+
+Hello guys! Today, we are going to continue our discussion on Model Context Protocol (MCP). In our previous video, we installed Cloudy Desktop and integrated it with MCP servers. We also explored the cloudy_desktop_config.json file, which allows us to configure MCP servers like Airbnb and DuckDuckGo Search, providing features such as web search and external service integration.
+
+In this video, we will focus on installing Cursor ID, one of the most popular IDEs that can serve as an MCP host. Cursor ID provides a rich UI and allows seamless integration with multiple MCP servers, similar to Cloudy Desktop. You can download it from www.cursor.com
+. For Windows, simply click the download link, then double-click the .exe file and follow the installation wizard by clicking Next until the installation completes. Once installed, open Cursor ID by searching for “Cursor” on your system.
+
+Once Cursor ID is open, you will notice a highly interactive interface. On the right-hand side, there’s a panel where you can ask questions, provide context, or even interact with AI agents for various tasks. This is where the MCP client communicates with MCP servers. You can also view your file repository and project files directly in Cursor ID, making it easier to manage code and configurations.
+
+To view and manage MCP servers in Cursor ID, go to File > Preferences > Cursor Settings, then navigate to the MCP section. Here, you can see the MCP servers already configured. For example, I have integrated Playwright, Airbnb, DuckDuckGo Search, Heroku platform, and a custom Weather MCP server. Each MCP server has its own JSON configuration file, similar to how we configured Cloudy Desktop:
+
+{
+    "mcp_servers": {
+        "airbnb": {
+            "command": "pnp",
+            "args": ["airbnb-mcp-server"]
+        },
+        "duckduckgo": {
+            "command": "np",
+            "args": ["-y", "duckduckgo-mcp-server"]
+        },
+        "weather": {
+            "command": "python",
+            "args": ["weather.py"]
+        }
+    }
+}
+
+
+For example, my custom Weather MCP server is implemented in weather.py, which allows you to fetch weather alerts. Here’s a snippet of how it works:
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route("/weather", methods=["GET"])
+def get_weather():
+    location = request.args.get("location", "California")
+    # Here you can call an API or custom logic
+    response = {
+        "location": location,
+        "alerts": ["Sunny", "High UV Index", "Windy conditions"]
+    }
+    return jsonify(response)
+
+if __name__ == "__main__":
+    app.run(port=5000)
+
+
+With this setup, when you ask Cursor ID:
+Hey, provide me the weather alerts of California, the MCP client communicates with this custom server and retrieves responses like ["Sunny", "High UV Index", "Windy conditions"].
+
+The advantage of Cursor ID is that it behaves like a wrapper over VSCode, so all VSCode functionalities remain intact. You can add or remove MCP servers at any time by updating the JSON configuration and restarting the IDE. Cursor ID also allows you to create, deploy, and interact with your own MCP servers while still supporting third-party services like Airbnb or DuckDuckGo Search.
+
+In summary, this video focused on installing Cursor ID, exploring its interface, and understanding how to integrate both third-party MCP servers and custom MCP servers. This provides a modular approach where you can easily add new services, run them via Python or Node.js, and interact with them seamlessly through Cursor ID’s interface. In upcoming videos, we will build MCP servers from scratch and integrate them into both Cloudy Desktop and Cursor ID.
+
+This concludes the video for today. The key takeaway is that Cursor ID simplifies MCP host management and makes integrating multiple MCP servers extremely straightforward.
+
+**C) Getting Started With Smithery AI**
+
+In this video, we are continuing our discussion on the Model Context Protocol (MCP). In our previous videos, we installed Cloudy Desktop and Cursor ID, and we also saw how to integrate MCP servers into both hosts. I showed you the entire mechanism step by step. Cursor ID acts as a wrapper on top of VSCode, which makes it easier to use if you are familiar with VSCode. The best part about Cursor ID is that it comes with tools that allow you to communicate with agents, provide information, and even integrate MCP servers directly within the IDE. We also explored how to see MCP settings in Cursor ID, and how to add a new MCP server by editing the MCP.json configuration file.
+
+In this video, we will focus on a platform called Smithereen. This platform acts as an aggregator for various MCP servers provided by different service providers. Some of the popular MCP servers available on Smithereen include Memory Tool, Supabase, GitHub, Slack, Notion, and many more. There are also servers for specific purposes, such as DuckDuckGo Search for web search, Perplexity Search, and Playwright for browser automation. The key advantage of Smithereen is that it provides ready-to-use configurations for MCP servers, making it easier for developers to integrate these servers into their hosts or clients.
+
+To demonstrate, let’s take an example of integrating the DuckDuckGo Search MCP server. When you navigate to this server on Smithereen, you will see several important pieces of information: the MCP server URL, a description stating that it enables web search capabilities and fetches web page content intelligently for enhanced LLM interaction, and the tools it provides, such as the search tool and fetch content tool. To integrate this MCP server into your host, go to the Install section on the right-hand side, select your client or host (for example, Cloudy Desktop), and choose the JSON option for configuration. This will give you a JSON snippet specifically for your platform, whether it is Windows, Mac, or Linux. Copy this configuration.
+
+For example, the JSON snippet for Windows may look like this:
+
+{
+    "name": "duckduckgo_search",
+    "command": "cmd",
+    "args": ["--url", "https://example-mcp-server.com"],
+    "key": "YOUR_API_KEY"
+}
+
+
+Next, open Cloudy Desktop and navigate to File > Settings > Edit Config. Paste the copied configuration into the cloud_desktop_config.json file. Make sure the formatting is correct and all commas are in place. Save the file, then force close Cloudy Desktop from the Task Manager and reopen it. Once reopened, you should see the new MCP server listed in the interface.
+
+Now you can test the integration by performing searches directly from Cloudy Desktop. For example, you can do a Web Search by typing “Agentic AI” or a Research Paper Search by querying “Attention is All You Need.” The platform will fetch results, including research papers, web pages, and other relevant content. You can also approve responses, allowing the host to save them for later reference.
+
+The process for integrating MCP servers into Cursor ID is very similar. First, copy the JSON configuration from Smithereen. Then, open Cursor ID and go to File > Preferences > Cursor Settings > MCP. Click on Add New Global MCP Server and paste the JSON configuration. Make sure that all commas and brackets are correctly placed. Save the configuration. Unlike Cloudy Desktop, Cursor ID does not require a restart, and the MCP server will appear immediately. You can now use this server to interact directly within Cursor ID, perform web searches, fetch research papers, and more.
+
+Once your MCP servers are integrated, you can also manage them by enabling, disabling, or deleting any server configuration as needed. For example, if a particular MCP server is not working or you do not want to use it, you can simply remove it from the JSON configuration, save the file, and the server will no longer appear in the host interface. This flexibility allows you to customize your host setup according to your needs.
+
+By using Smithereen and adding MCP servers to Cloudy Desktop or Cursor ID, you gain access to multiple services from different providers in one place. This approach ensures that whatever MCP server you need—whether for web search, research, or automation—you can integrate it with minimal effort. You also have the ability to explore each server in a playground environment, test its performance, and decide whether it fits your workflow before fully integrating it.
+
+In summary, this video demonstrated how to integrate MCP servers from Smithereen into both Cloudy Desktop and Cursor ID. We saw how to copy JSON configurations, add them to the host settings, test web searches and research paper searches, and manage server configurations. This process allows you to extend the capabilities of your MCP client or host by connecting it to multiple external services, all while maintaining flexibility and control.
+
+I hope you found this video helpful. In the next video, we will continue exploring more MCP servers and show additional advanced integrations. Thank you for watching, take care, and see you in the next video!
+
+**D) Building MCP Servers With Tools And Client From Scratch Using Langchain**
+
+(Transcript Not Available for now - will take notes from the Video later)
