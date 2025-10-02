@@ -88,6 +88,22 @@
 
 **D) Runtime Human Feedback In Workflow**
 
+**XIV) RAG with LangGraph**
+
+**A) Agentic RAG Theoretical Understanding**
+
+**B) Agentic RAG Implementation- Part 1**
+
+**C) Agentic RAG Implementation-Part 2**
+
+**D) Corrective RAG Theoretical Understanding**
+
+**E) Corrective RAG Practical Implementation**
+
+**F) Adaptive RAG Theoretical Understanding**
+
+**G) Adaptive RAG Implementation**
+
 **XIX) Model Context Protocol**
 
 **AA) Demo of MCP with Claude Desktop**
@@ -2279,5 +2295,586 @@ This workflow demonstrates several key points: the state snapshot records the cu
 Overall, this tutorial covers three main aspects of human-in-the-loop workflows: interrupts before nodes, editing human feedback dynamically, and waiting for human input before continuing execution. You can experiment by adding more nodes, conditional branches, or multiple tool calls. For example, you can place interrupts after the assistant, or add additional assistant nodes to process intermediate results. This approach ensures that humans are always in control of critical decisions while the workflow executes smoothly.
 
 By combining graph.stream(), update_state(), get_state(), and get_state_history(), we can create robust, interactive workflows where human input is incorporated at any stage. This makes LineGraph a powerful tool for building intelligent systems that require human oversight or dynamic decision-making.
+
+# **XIV) RAG with LangGraph**
+
+**A) Agentic RAG Theoretical Understanding**
+
+Hello guys, so we are going to continue the discussion with respect to our Agentic AI bootcamp with LangGraph series. In the previous video, we had already explored different types of workflows in LangGraph, understood how to properly apply human feedback, and also learned how to debug a LangGraph application with the help of LangGraph Studio. Now, in this particular video and in the upcoming series of videos, we are going to dive into different types of RAGs. The first RAG we are going to discuss is something called Agentic RAG.
+
+Let’s start with the definition. Agentic RAG, which stands for Retrieval Augmented Generation, is a framework that enhances traditional RAG systems by incorporating intelligent agents. This is very important because by incorporating agents or intelligent assistance, we can handle complex tasks and make dynamic decisions within our generative AI workflows. The main aim of bringing agents into a generative AI application is not only to generate responses, but also to orchestrate decisions, manage workflows, and dynamically route queries.
+
+Now, let’s first understand how a traditional RAG system works. Imagine we have a user who makes a query. Normally, in a generative AI application without RAG, this query goes to an LLM. Before it reaches the LLM, the query is usually incorporated with a prompt. The prompt guides the LLM about how to behave, while the query provides the actual user question. The LLM then produces a response. For example, in code, this might look like "response = llm.invoke({'prompt': 'Answer as politely as possible', 'query': user_query})".
+
+But when we convert this into a traditional RAG system, we add a vector database alongside the LLM. This vector database stores external knowledge in embeddings—things like company policies, product manuals, or FAQs. So now, when a user asks a query like “What is the company holiday policy?”, the query is first passed into the vector database. The vector DB retrieves the most relevant chunks of information and returns them as context, which is then combined with the query and prompt, and only then sent to the LLM. The LLM uses this extra knowledge to generate a more accurate output. In pseudo-code, it looks like:
+"context = vector_db.search(user_query); response = llm.invoke({'prompt': base_prompt, 'query': user_query, 'context': context})".
+
+So, in summary, the traditional RAG uses the LLM only once—to generate the final output—while relying on the vector DB to fetch supporting context.
+
+Now, let’s see how Agentic RAG is different. In Agentic RAG, the LLM is not just a passive text generator; it is converted into an agent that can dynamically decide how to act. For example, suppose you have multiple vector databases: one for company policies, another for legal documents, and another for product manuals. In a traditional RAG, routing queries to the correct DB is a manual process. But in Agentic RAG, the agent powered by the LLM decides which database to query, based on the user’s input.
+
+Here’s where the power comes in. Suppose the user asks: “What is the company’s holiday policy?” The agent analyzes the query and routes it to the policy database. If the query is about legal compliance, it routes it to the legal documents database. If the query is completely unrelated, like “Who won the last World Cup?”, the agent follows a fail route and responds with something like “I don’t know the answer to that.” In code, this would look like:
+"if 'policy' in user_query: context = policy_db.search(user_query); elif 'legal' in user_query: context = legal_db.search(user_query); else: context = None".
+Then, the agent decides:
+"if context: response = llm.invoke({'prompt': base_prompt, 'query': user_query, 'context': context}); else: response = 'I do not know the answer.'".
+
+This decision-making ability is what transforms a traditional RAG into an Agentic RAG. The agent is not only retrieving relevant documents but also making choices about whether to retrieve, from where to retrieve, and how to proceed if no data is available. This dynamic routing is far more powerful than just blindly attaching context.
+
+In fact, the LangGraph documentation itself shows diagrams where the agent decides whether or not to call a tool. If yes, it retrieves documents; if no, it directly generates an answer or follows a fail route. Sometimes the agent may even loop back, asking itself to retry retrieval until the right context is found, before producing the final answer.
+
+To summarize the definition once again: Agentic RAG uses an agent to figure out how to retrieve the most relevant information before using it to answer the question. A retrieval agent is particularly useful when we need to decide whether to retrieve from an index, which index to use, and how to integrate the retrieved data. To implement this in LangGraph, we simply need to give the LLM access to a retrieval tool. For example:
+"from langgraph.agents import create_retrieval_agent; agent = create_retrieval_agent(llm, tools=[policy_db_tool, legal_db_tool])".
+
+With this setup, the LLM itself becomes capable of intelligently deciding whether it needs to call the retrieval tool, which database to query, and how to use that knowledge in generating the final response. If no relevant information is available, it can gracefully return: "I don’t know the answer to that.".
+
+So, that’s the conceptual difference between a traditional RAG and an Agentic RAG. In the next video, we will do a hands-on practical implementation of Agentic RAG using LangGraph, where you’ll see how to build the agent, define retrieval tools, and orchestrate the workflow.
+
+That’s it for this session, I hope you liked the explanation and found it clear. I’ll see you in the next video—thank you and take care.
+
+**B) Agentic RAG Implementation- Part 1**
+
+So, we are going to continue our discussion with respect to the Agentic RAG system. In the previous video, we had already understood the exact differences between a traditional RAG and an Agentic RAG. Now, in this specific video, we will actually be implementing a small project so that you can clearly understand how Agentic RAG works in practice.
+
+Let’s first take a look at the workflow we are going to create. If you see the diagram, the entire thing is built using LangGraph. At the start, we have a node that represents the agent. From this agent, the flow is connected to a retrieve node. The retrieve node is linked to a vector database, which acts as the knowledge source. In our case, we will use two separate vector databases—one can be related to LangGraph blogs, and the other can be related to LangChain blogs. These could be backed by FAISS, Pinecone, Weaviate, or any other vector DB, but for our demo we’ll just show how this works conceptually.
+
+The workflow is as follows: whenever the user provides a query, the agent will first check whether retrieval is needed. If yes, it looks into the vector DBs to see whether any relevant context exists. Once context is retrieved, the next step is to validate this context. If the retrieved context is good, we go ahead and use it to generate a summary or answer. If the context is bad, however, we don’t directly use it. Instead, we pass the query to another agent whose job is to rewrite the query into a more precise form, and then send it back to the main agent for a new retrieval attempt. This is why we say it is an Agentic RAG system—because agents here are not just answering questions, they are actively deciding how to retrieve, what to rewrite, and when to stop.
+
+For example, let’s assume our two vector DBs store different content. One DB stores LangGraph blocks (DB1), and the other stores LangChain blocks (DB2). Now suppose the user asks, “What is LangGraph?” The agent has to decide which vector DB to query. Since the question is about LangGraph, it routes the query to DB1, retrieves the context, and checks whether it is relevant. If yes, it proceeds to generate a summary. In pseudo-code, this looks like "context = db1.search('What is LangGraph?')" followed by "response = llm.invoke({'query': 'What is LangGraph?', 'context': context})".
+
+But suppose the retrieved context is not strong or precise enough. In that case, another node—our rewrite agent—kicks in. This agent takes the original question and rewrites it into something better aligned with the data. For example, instead of just “What is LangGraph?”, the rewritten query could become, “What are the important features of LangGraph as described in the official blogs?” This rewritten query is then sent back into the agent loop for a more targeted retrieval. This makes the system more adaptive than a traditional RAG.
+
+Now, let’s start building this step by step in code. I’ve created a new folder named "06_rags_agentic_rag.ipynb". As usual, the first step is to import the required libraries. For this, we write:
+"import os; from dotenv import load_dotenv; load_dotenv()".
+Once executed, this loads our environment variables including API keys. For our demo, I’ll use the Grok API, though you could also use the OpenAI API.
+
+Since we need two vector databases (one for LangGraph blogs and one for LangChain blogs), let’s create the retrievers. For that, we first load documents from websites. We can use LangChain’s WebBaseLoader to fetch blog content. The code looks like:
+"from langchain_community.document_loaders import WebBaseLoader"
+followed by something like "docs = [WebBaseLoader(url).load() for url in urls]".
+
+These documents then need to be chunked before storing them as embeddings in a vector DB. For that, we use a text splitter:
+"from langchain.text_splitter import RecursiveCharacterTextSplitter"
+and then "text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)".
+Splitting is done via "doc_splits = text_splitter.split_documents(docs)".
+
+Next, we store these chunks into a vector DB. For simplicity, let’s use FAISS:
+"from langchain.vectorstores import FAISS"
+and then build it as:
+"vectorstore = FAISS.from_documents(doc_splits, embedding=OpenAIEmbeddings())".
+Finally, we convert it into a retriever:
+"retriever = vectorstore.as_retriever()".
+
+To check, we can query the retriever directly with:
+"retriever.invoke('What is LangGraph?')"
+and it will return the top context documents with metadata.
+
+But remember, just having a retriever is not enough. Since we are working with Agentic RAG, we need to integrate these retrievers into tools that the agent can call. LangChain provides "create_retriever_tool". For example:
+"from langchain.tools.retriever import create_retriever_tool"
+then:
+"retriever_tool = create_retriever_tool(retriever, name='retriever_langgraph', description='Search and return info about LangGraph')".
+
+Similarly, we repeat the process for LangChain blogs: fetch URLs, load documents, split into chunks, embed, store into another vector DB, create a retriever, and finally wrap it as a tool with "create_retriever_tool". This gives us something like:
+"retriever_tool_langchain = create_retriever_tool(retriever2, name='retriever_langchain', description='Search and return info about LangChain')"
+
+At this point, we have two retriever tools: one for LangGraph and one for LangChain. Together, these will allow the agent to dynamically decide where to route the query. For example, "tools = [retriever_tool_langgraph, retriever_tool_langchain]".
+
+In the next step—which we’ll cover in the following video—we’ll bind these tools with the LLM so that the agent can make intelligent decisions about retrieval, rewriting, and summarization. For now, what we’ve achieved is the creation of two separate vector databases, converted them into retrievers, wrapped them into retriever tools, and made them ready to be integrated into an Agentic RAG workflow.
+
+I hope this gave you a clear idea of how the foundation of our Agentic RAG is set up. In the next video, we’ll continue building the agent nodes—like the rewrite node and the summary generator—to complete the workflow. Thank you, and see you in the next one.
+
+**C) Agentic RAG Implementation-Part 2**
+
+So we are going to continue the discussion with respect to our Agentic RAG implementation. In the previous video, we had already seen how to implement vector databases using LangChain. We also created our retrieval tools. Now, if you look at the workflow diagram, what we’ve done so far is just this “tools” part. There are still many nodes to implement, and that is exactly what we’ll focus on in this video.
+
+Our goal now is to start building the workflow using LangGraph. In short, we are going to create the entire Agentic RAG pipeline as shown in the diagram. We’ll start with the agent node, then gradually add nodes for rewrite, generate, and the decision-making components that connect them.
+
+As you already know from earlier videos, when working with LangGraph the first thing we need is a state. This state allows us to store information that can be accessed by every node in the workflow. So let’s go ahead and create that. For this, we first import the necessary libraries:
+"from typing import Annotated, Sequence"
+"from typing_extensions import TypedDict"
+"from langgraph.graph.message import BaseMessage, add_messages".
+
+Here, "BaseMessage" is used to define the structure of our messages, while "add_messages" acts like a reducer, appending all the content into a single messages variable. Then we define our class:
+"class AgentState(TypedDict): messages: Annotated[Sequence[BaseMessage], add_messages]".
+
+This ensures that all messages—questions, responses, contexts—are stored inside a single state object, accessible by every node in the graph.
+
+Next, let’s import and initialize our LLM. This time, instead of the older model, we’ll use the latest "grok" model powered by "qwen-32b", since the previous one was decommissioned. The import looks like:
+"from langchain_groq import ChatGroq".
+Then we set it up with:
+"llm = ChatGroq(model='qwen-32b')"
+
+To check whether the model is working fine, we can simply run:
+"llm.invoke('Hi')"
+and you should see an AI-generated response.
+
+Now let’s start creating our first node: the agent node. In LangGraph, a node is just a Python function. So we define:
+"def agent(state: AgentState) -> AgentState:".
+
+This agent node is responsible for invoking the LLM with the current system prompt and deciding whether to use retrieval tools or not. Inside, we print "Call agent" for debugging, initialize the model, and then bind the retrieval tools. Binding is important because only this agent node needs direct access to the retrievers. We do this with:
+"llm.bind_tools([retriever_tool_langgraph, retriever_tool_langchain])".
+
+Once bound, the agent can decide where to route the query, fetch context if needed, and append the response back into the "messages" list. This makes our agent node functional.
+
+But that’s not enough. After retrieval, we must also evaluate whether the retrieved documents are relevant or not. For this, we introduce the "grade_documents" function. Its purpose is to decide whether the retrieved docs should be passed to generate or rewrite.
+
+Here we use Pydantic to define a structured output:
+"class Grade(BaseModel): binary_score: str = Field(description='Relevance score: yes or no')"
+
+This ensures that the model always returns either "yes" or "no". We then configure the model with:
+"structured_llm = llm.with_structured_output(Grade)".
+
+Next, we create the prompt:
+"You are grading relevance of retrieved documents to the user question. If relevant, return 'yes'; otherwise return 'no'."
+
+The input variables here are "context" (from the retrieved docs) and "question" (from the user). We attach this prompt to our structured LLM, run the chain with "chain.invoke({'context': docs, 'question': question})", and receive a binary score. If the score is "yes", we proceed to generate. If "no", we proceed to rewrite.
+
+Now let’s define the generate node. This node simply takes the relevant documents and creates a final answer. The function looks like:
+"def generate(state: AgentState) -> AgentState:".
+Inside, we use a prompt template such as:
+"Given the following context: {context}, answer the user’s question: {question}".
+We then run it with "llm.invoke({...})", parse the output, and append the final answer into the messages.
+
+But what if the retrieved docs were not relevant? That’s where the rewrite node comes in. The rewrite node reformulates the user query into a better, more precise version. The code looks like:
+"def rewrite(state: AgentState) -> AgentState:".
+Here, we instruct the LLM with:
+"Look at the input and reformulate it into a clearer, more specific question."
+The new query is generated and then appended back into the messages so the agent can retry retrieval.
+
+With these nodes ready, we can now assemble the full workflow using LangGraph. We initialize the graph with:
+"from langgraph.graph import StateGraph"
+"graph = StateGraph(AgentState)".
+
+Then we add our nodes:
+"graph.add_node('agent', agent)"
+"graph.add_node('retrieve', retrieve)"
+"graph.add_node('generate', generate)"
+"graph.add_node('rewrite', rewrite)".
+
+We connect the edges:
+
+From start → agent
+
+From agent → retrieve (if tool is called) or agent → end
+
+From retrieve → grade_documents
+
+From grade_documents → generate (if relevant) or grade_documents → rewrite (if not)
+
+From rewrite → agent (looping back with the improved query)
+
+Once the graph is built, we compile it with "app = graph.compile()". To run, we call:
+"app.invoke({'messages': [HumanMessage(content='What is LangGraph?')]})".
+
+When executed, you’ll see the flow clearly: the agent calls retrieval, the documents are graded, relevance is checked, and if relevant, the answer is generated. For example, asking "What is LangGraph?" routes to the LangGraph vector DB, marks the docs as relevant, and goes straight to generate. Asking "What is LangChain?" does the same but with the LangChain DB. And if you ask something unrelated, like "What is Machine Learning?", the agent directly answers without hitting the retrievers.
+
+And just like that, we’ve built a complete Agentic RAG system with LangGraph. Step by step, we created the state, nodes, grading logic, generate and rewrite functionality, and finally stitched everything together into a graph workflow.
+
+Now you can easily extend this by adding more retrievers, different grading strategies, or even custom nodes depending on your use case. I hope this session made things clear and practical. See you in the next video.
+
+**D) Corrective RAG Theoretical Understanding**
+
+So, we are going to continue our discussion with respect to the different types of RAG. In this specific video, we will talk about something called Corrective RAG, also known as CRAG. We’ll try to understand how Corrective RAG actually works, and why it is such an amazing and efficient technique for improving the accuracy of retrieval-augmented generation systems. Once we understand the theoretical flow, in the next video we will go ahead and implement this with the help of LangGraph.
+
+So first of all, let’s begin with the definition. Corrective RAG (CRAG) is an advanced technique within Retrieval-Augmented Generation that focuses on improving both the accuracy and the relevance of generated responses. It does this by incorporating mechanisms for self-reflection and self-grading of the retrieved documents. In other words, instead of blindly trusting whatever the retriever brings back from the vector database, CRAG actually evaluates the quality of those documents and then applies corrective actions when necessary.
+
+Now, let’s break this down a little more. At its core, Corrective RAG is still a RAG system—you still have a retriever pulling content from a vector database, and you still have an LLM generating answers. But the big difference is that CRAG introduces two additional capabilities: self-reflection and self-grading. These allow the system to ask itself: “Are these retrieved documents actually relevant to the user’s query?” and, if not, “What corrective action should I take to fix this?”
+
+Let’s walk through the flow to see how this works. Imagine a user asks a question. The query first goes to the retriever node, which fetches documents from the vector database. Once those documents are retrieved, we don’t immediately send them to the LLM. Instead, we first grade them. This grading step is essentially evaluating the retrieved documents. For example, in code you might have something like:
+"result = grader.invoke({'question': user_query, 'docs': retrieved_docs})".
+The grader then gives a binary decision: either "yes" (the docs are relevant) or "no" (the docs are irrelevant).
+
+Now, let’s consider both cases. If the grader says yes, the documents are passed to the LLM as usual. The LLM combines the query, the prompt, and the context, and generates the final response. For example:
+"response = llm.invoke({'prompt': base_prompt, 'query': user_query, 'context': docs})".
+
+But if the grader says no, meaning the documents are irrelevant or not useful, then we trigger a corrective action. This is where CRAG becomes powerful. One common corrective action is to rewrite the user query into a clearer or more specific form. For example:
+"new_query = llm.invoke({'prompt': 'Rewrite this unclear query into a precise one', 'query': user_query})".
+In addition to rewriting the query, CRAG can also initiate a web search to bring in external information beyond what is available in the local vector database. For example:
+"web_results = web_search_tool.invoke(new_query)".
+This allows the system to still provide a meaningful answer even when the internal knowledge base doesn’t have the required information.
+
+So essentially, the corrective action here is twofold: rewrite the query and expand retrieval sources (like web search) when the vector DB alone cannot provide relevant results. This is exactly what we mean by self-reflection and self-grading: the system reflects on the quality of its own retrievals, grades them, and if they are lacking, it takes corrective measures.
+
+Now, let’s also connect this to the bigger picture. Traditional RAG systems rely heavily on the assumption that the retrieved documents are accurate. But if the retriever brings back flawed or incomplete information, the generated answer is also flawed. Corrective RAG addresses this limitation by introducing retriever evaluation (grading) and refinement/correction (rewriting or searching again). This makes the generated responses more accurate, more relevant, and far more robust.
+
+The core components of CRAG can be summarized as:
+
+Retriever – fetches documents from the vector DB.
+
+Evaluator (grader) – checks whether the documents are relevant.
+
+Generative model (LLM) – produces the final response when relevant context is available.
+
+Refinement/Correction module – takes corrective action (like query rewriting or web search) when documents are not relevant.
+
+Some of the benefits of CRAG are very clear. First, you get improved accuracy, since the system is actively correcting irrelevant or low-quality retrievals. Second, you get better relevance, because irrelevant documents are filtered out before generating a response. And third, you get increased robustness, since even if your retriever fails, the corrective mechanisms like query rewriting and web search still allow the system to answer effectively.
+
+So to summarize: Corrective RAG (CRAG) is all about making your retrieval-augmented generation pipeline smarter and more self-aware. It uses self-reflection and self-grading to evaluate retrievals, and applies corrective actions like rewriting queries and using web search when necessary. In the next video, we’ll take this flow diagram and actually implement the whole solution in LangGraph, just like we did for Agentic RAG. That means defining the retriever, adding the grader node, and implementing refinement and correction. For the web search part, we can even connect external APIs to make it more realistic.
+
+I hope you liked this explanation of Corrective RAG. In the next session, we’ll dive into the hands-on coding part. Until then, thank you and take care.
+
+**E) Corrective RAG Practical Implementation**
+
+Hello guys, in this video we are going to continue the discussion on Corrective RAG. The idea here is to implement the entire workflow graph that handles retrieval, grading, corrective actions like query rewriting, and finally generation. Essentially, we’ll see how to create the retriever node, the grade node, how to perform grading, and then implement the corrective actions. These corrective actions—self-reflection and self-grading—form the refinement and correction stage of our workflow.
+
+On the right side of the diagram is the graph we are going to implement. On the left side, you can see the steps: first, we will create the retriever node. Then, we add the grade documents node. This is connected by a conditional edge to check whether the documents are relevant. If the retrieved documents are not relevant, we transform the query, perform a web search, and finally generate the response. If they are relevant, we can directly generate the output by combining the retrieved context with the LLM and system prompt.
+
+Step 1: Creating the Retriever
+
+First, we import the required libraries and set up environment variables such as the OpenAI API key. You can also use Groq if you prefer, but OpenAI is more stable for this kind of use case.
+
+We then build the index by loading data using loaders such as WebBaseLoader or RecursiveCharacterTextSplitter. For embeddings, we use OpenAI embeddings. For example:
+“`python
+from langchain.document_loaders import WebBaseLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+
+urls = [
+"https://example.com/prompt_engineering
+",
+"https://example.com/adversarial_llms
+",
+"https://example.com/agents
+"
+]
+
+loader = WebBaseLoader(urls)
+docs = loader.load()
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+splits = text_splitter.split_documents(docs)
+
+embedding = OpenAIEmbeddings()
+vectorstore = Chroma.from_documents(documents=splits, embedding=embedding)
+retriever = vectorstore.as_retriever()
+“`
+
+This completes our retriever node.
+
+Step 2: Creating the Grader
+
+Now, let’s move to the grader functionality. The goal is to check if retrieved documents are relevant to the user’s question. For structured outputs, we use Pydantic models:
+“`python
+from pydantic import BaseModel, Field
+
+class GradeDocuments(BaseModel):
+binary_score: str = Field(description="Relevance of documents: Yes or No")
+“`
+
+We then initialize our LLM with structured output:
+“`python
+from langchain.chat_models import ChatOpenAI
+from langchain.chains.openai_functions import create_structured_output_chain
+
+llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+grader_chain = create_structured_output_chain(GradeDocuments, llm)
+“`
+
+And we add a system prompt to guide the grading:
+“python system_prompt = """ You are a grader assessing relevance of a retrieved document to a user question. If the document contains keyword or semantic meaning related to the question, grade it as Yes. Otherwise, grade it as No. """ “
+
+This means whenever we pass a query and the retrieved docs into this chain, the output will be Yes/No.
+
+Step 3: Generation Node
+
+If documents are relevant, we move directly to the generate node. Here we use a predefined RAG prompt and LLM chain:
+“`python
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.output_parsers import StrOutputParser
+
+prompt = PromptTemplate.from_template("Answer the question based on the context:\n\n{context}\n\nQ: {question}\nA:")
+generate_chain = LLMChain(llm=llm, prompt=prompt, output_parser=StrOutputParser())
+“`
+
+When invoked with context and question, this chain generates the final response.
+
+Step 4: Query Rewriter
+
+If the grader says the docs are not relevant, we add a query rewriting step. For this, we again use an LLM and prompt:
+“python rewrite_prompt = PromptTemplate.from_template("Rewrite the user question to improve retrieval. Original: {question}") rewrite_chain = LLMChain(llm=llm, prompt=rewrite_prompt, output_parser=StrOutputParser()) “
+
+For example, if the input was “agent memory”, the output may become “What is the role of memory in artificial intelligence agents?”.
+
+Step 5: Web Search Node
+
+After rewriting, we can add a web search node. This can be done using community tools such as Tavily Search:
+“python from langchain_community.tools import TavilySearchResults web_search = TavilySearchResults(k=3) “
+
+This will fetch the top three results for the rewritten query, which can then be passed back into the generator.
+
+Step 6: Building the Graph
+
+Now that we have all the building blocks—retriever, grader, generator, rewriter, and web search—we combine them into a state graph. Each function is defined as a node, and edges connect them. For example:
+“`python
+from langgraph.graph import StateGraph
+
+graph = StateGraph()
+
+graph.add_node("retriever", lambda q: retriever.invoke(q))
+graph.add_node("grader", lambda docs, q: grader_chain.invoke({"documents": docs, "question": q}))
+graph.add_node("generator", lambda docs, q: generate_chain.invoke({"context": docs, "question": q}))
+graph.add_node("rewriter", lambda q: rewrite_chain.invoke({"question": q}))
+graph.add_node("web_search", lambda q: web_search.run(q))
+“`
+
+Edges are then defined. From retriever → grader, from grader → generator (if relevant), or grader → rewriter → web_search → generator (if not relevant). Finally, the generator → end.
+
+Step 7: Execution
+
+When we invoke the graph with a question like “What are the types of agent memory?”, here’s what happens step by step:
+
+Retriever fetches documents.
+
+Grader checks relevance → If relevant, directly generate.
+
+If not relevant, rewrite query → web search → generate.
+
+And in practice, you will see logs like:
+
+“Graded documents: Not relevant”
+
+“Rewritten query: What is the role of memory in AI agents?”
+
+“Performing web search…”
+
+“Generated Answer: …”
+
+This way, we ensure that even if the retriever fails, the system can self-correct and still produce accurate answers.
+
+So that’s the end-to-end implementation of Corrective RAG. The main thing to remember is the workflow: Retrieve → Grade → Conditional Edge (Relevant/Not Relevant) → Generate or Rewrite+Search → Generate. By implementing this self-grading and correction loop, we can achieve more reliable RAG systems.
+
+**F) Adaptive RAG Theoretical Understanding**
+
+Hello guys, in this video we are going to continue our discussion on different types of Retrieval Augmented Generation (RAG).
+
+In the previous video, we implemented something called Agentic RAG. We understood how Agentic RAG works, took a concrete example, and walked through the workflow step by step.
+
+Now, in this specific video, and in the upcoming ones, we are going to focus on Adaptive RAG. I’ve included multiple diagrams to make sure the theoretical intuition is clear before we move on to the practical implementation. The workflow we are going to implement looks a bit complex, but we will break it down step by step.
+
+What is Adaptive RAG?
+
+Let’s start with the definition. Adaptive RAG, or Adaptive Retrieval Augmented Generation, is a framework that dynamically adjusts its strategy for handling queries based on their complexity.
+
+This is a very important point—Adaptive RAG is all about adapting the retrieval strategy depending on whether the query is simple, moderately complex, or highly complex.
+
+Think of it like a smart assistant that knows when to give a quick, straightforward answer, and when to dig deeper into external sources, databases, or multi-step reasoning. Instead of a rigid one-size-fits-all approach, Adaptive RAG chooses the most appropriate retrieval method for each query, balancing speed and accuracy.
+
+Now, if you recall Agentic RAG, in that case it was the agent that decided which route to take. But here, there’s no explicit agent making that decision. Instead, Adaptive RAG uses a classifier or query analysis module that dynamically adjusts the strategy.
+
+So, in Adaptive RAG there are two important steps:
+
+Query Analysis
+
+RAG + Self-Reflection (also called Self-Corrective RAG)
+
+We’ll understand both of these one by one.
+
+Step 1: Query Analysis
+
+The first stage is query analysis. Looking at the diagram, you can see that whenever a question comes in, it first passes through the query analysis step.
+
+The role of query analysis is simple: it determines the complexity of the query and then routes it to the most suitable retrieval method. For example:
+
+If the query is very simple, we might just pass it directly to the LLM and get an answer.
+
+If the query is moderately complex, we might need a web search to bring in relevant, fresh information.
+
+If the query is highly complex or very domain-specific, then we route it to the retriever connected to a vector database containing internal knowledge.
+
+So query analysis is essentially a routing mechanism. It classifies the query, decides its complexity, and then forwards it to the right path.
+
+Step 2: RAG + Self-Reflection (Self-Corrective RAG)
+
+Now let’s talk about the second stage, which is RAG with self-reflection. This is also known as self-corrective RAG.
+
+Imagine we have a complex query that requires internal company knowledge. For example:
+
+“What are the policies for company XYZ in India?”
+
+In this case, query analysis realizes that a web search alone won’t work, since this information may not be fully available on the internet. Instead, the query is routed to the retriever.
+
+The retriever is connected to a vector database, which contains indexed documents about the company. But here’s the interesting part: if the initial retrieval doesn’t give sufficient results, Adaptive RAG can rewrite the query and try again.
+
+This process of rewriting, regenerating, and verifying is what we call self-reflection or self-correction.
+
+Here’s how it works step by step:
+
+Query goes to the retriever.
+
+Retrieved documents are graded for relevance.
+
+If documents are relevant → proceed to generation.
+
+If documents are not relevant → rewrite the query and try again.
+
+After generation, we can also check for hallucination. If the answer is inaccurate, the flow loops back to the retriever for refinement.
+
+This loop of retrieval → grading → rewriting → generation is the heart of self-corrective RAG.
+
+Examples of Query Analysis in Action
+
+Let me give you three quick examples to make this clearer:
+
+Simple Query: “What is the capital of India?”
+→ Query analysis marks it as simple.
+→ Directly answered by the LLM.
+
+Moderate Query: “Talk about the economics of India.”
+→ Query analysis marks it as complex.
+→ Routes to web search for updated economic data.
+
+Highly Complex Query: “What are the internal policies of company XYZ in India?”
+→ Query analysis marks it as very complex.
+→ Routes to the retriever with vector database.
+→ If initial retrieval isn’t enough, query rewriting and self-correction kicks in.
+
+This demonstrates how Adaptive RAG tailors the strategy based on query type.
+
+Implementation Workflow
+
+Now, let’s connect this theory to the workflow diagram.
+
+Input query enters.
+
+Query classifier decides whether it should go to web search, retriever, or directly to the LLM.
+
+If routed to web search → generate the answer.
+
+If the answer is good enough → end.
+
+If not useful → transform the query → send to retriever.
+
+If routed to retriever → retrieve documents → grade them.
+
+If relevant → generate and end.
+
+If not relevant → rewrite query → retrieve again → repeat until we get meaningful content.
+
+This flow shows how query analysis and self-reflection combine to form Adaptive RAG.
+
+Summary
+
+So to summarize:
+
+In Agentic RAG, an agent made the decision on which route to take.
+
+In Adaptive RAG, we use a classifier to analyze the query and route it based on complexity.
+
+For simple queries → direct answer.
+
+For moderately complex queries → web search.
+
+For highly complex/domain-specific queries → retriever + self-reflection loop.
+
+In the next video, we will go step by step through the implementation of this Adaptive RAG workflow in code, building the classifier, connecting the retriever, adding self-reflection, and running through examples.
+
+I hope you found this explanation helpful. I’ll see you in the next video. Thank you, and take care.
+
+**G) Adaptive RAG Implementation**
+
+Hello guys, in this video we are going to continue our discussion on different types of Retrieval Augmented Generation (RAG). In the previous video, we implemented something called Agentic RAG. We understood how Agentic RAG works, took a concrete example, and walked through the workflow step by step.
+
+Now, in this specific video, and in the upcoming ones, we are going to focus on Adaptive RAG. I’ve included multiple diagrams to make sure the theoretical intuition is clear before we move on to the practical implementation. The workflow we are going to implement looks a bit complex, but we will break it down step by step.
+
+So, what is Adaptive RAG? Adaptive RAG, or Adaptive Retrieval Augmented Generation, is a framework that dynamically adjusts its strategy for handling queries based on their complexity. This is a very important point—Adaptive RAG is all about adapting the retrieval strategy depending on whether the query is simple, moderately complex, or highly complex. Think of it like a smart assistant that knows when to give a quick, straightforward answer, and when to dig deeper into external sources, databases, or multi-step reasoning. Instead of a rigid one-size-fits-all approach, Adaptive RAG chooses the most appropriate retrieval method for each query, balancing speed and accuracy.
+
+If you recall Agentic RAG, in that case it was the agent that decided which route to take. But here, there’s no explicit agent making that decision. Instead, Adaptive RAG uses a classifier or query analysis module that dynamically adjusts the strategy. So, in Adaptive RAG there are two important steps: Query Analysis and RAG + Self-Reflection (Self-Corrective RAG).
+
+Let’s begin with Step 1: Query Analysis. The first stage is query analysis. Looking at the diagram, you can see that whenever a question comes in, it first passes through the query analysis step. The role of query analysis is simple: it determines the complexity of the query and then routes it to the most suitable retrieval method. For example: if the query is very simple, we might just pass it directly to the LLM and get an answer. If the query is moderately complex, we might need a web search to bring in relevant, fresh information. And if the query is highly complex or very domain-specific, then we route it to the retriever connected to a vector database containing internal knowledge.
+
+To implement this query analysis router, we can start with a Pydantic model to validate our classifier output. Inside Python, we can define:
+
+"from pydantic import BaseModel, Field
+from typing import Literal
+
+class RouteQuery(BaseModel):
+ data_source: Literal['direct', 'websearch', 'retriever'] = Field(description='Route user query')"
+
+This ensures the classifier output is always one of three: direct, websearch, or retriever. Next, we can build the router prompt. For example:
+
+"from langchain.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+
+router_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)
+
+route_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are an expert router. Classify whether a query should be answered directly by the LLM, needs a web search, or requires the vector retriever.'),
+ ('human', '{question}')
+])"
+
+So now, when I ask something like “What is the capital of India?” the router returns direct. If I ask “Talk about the economics of India” it routes to websearch. And if I ask “What are the internal policies of company XYZ in India?” it routes to retriever.
+
+Now moving to Step 2: RAG + Self-Reflection (Self-Corrective RAG). Imagine we have a complex query that requires internal company knowledge, like “What are the policies for company XYZ in India?” In this case, query analysis realizes that a web search alone won’t work, since this information may not be fully available on the internet. Instead, the query is routed to the retriever.
+
+The retriever is connected to a vector database, which contains indexed documents about the company. Let’s set up a retriever in Python. We can do this by first loading documents, splitting them, and embedding them:
+
+"from langchain_community.document_loaders import WebBaseLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+
+urls = ['https://example.com/agents
+', 'https://example.com/policies
+']
+docs = []
+for url in urls:
+ loader = WebBaseLoader(url)
+ docs.extend(loader.load())
+
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+split_docs = splitter.split_documents(docs)
+
+embeddings = OpenAIEmbeddings()
+vectorstore = FAISS.from_documents(split_docs, embeddings)
+retriever = vectorstore.as_retriever()"
+
+Now here’s the interesting part: if the initial retrieval doesn’t give sufficient results, Adaptive RAG can rewrite the query and try again. This process of rewriting, regenerating, and verifying is what we call self-reflection.
+
+So the loop works like this: query goes to retriever → retrieved documents are graded for relevance → if relevant, we generate an answer → if not, we rewrite the query and re-run retrieval.
+
+To grade documents, we can define a simple relevance grader:
+
+"from pydantic import BaseModel
+
+class GradeDocs(BaseModel):
+ score: Literal['yes', 'no']
+
+grader_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are a grader. If the retrieved document is relevant to the user question, return yes else no.'),
+ ('human', 'Question: {question}\nDocument: {doc}')
+])
+
+grader_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)"
+
+If the score is "no", we pass the query to a query rewriter node:
+
+"rewrite_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'Rewrite the user question to optimize it for vector retrieval.'),
+ ('human', '{question}')
+])"
+
+This way, poorly phrased queries are improved automatically.
+
+Finally, when documents are relevant, we generate the answer using a RAG prompt:
+
+"gen_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are a helpful assistant. Answer based strictly on the provided context.'),
+ ('human', 'Question: {question}\nContext: {docs}')
+])
+
+generator = gen_prompt | ChatOpenAI(model='gpt-4o-mini')"
+
+Now let’s see examples of query analysis in action.
+
+For a simple query: “What is the capital of India?” → query analysis marks it as simple → we directly answer using the LLM.
+
+For a moderate query: “Talk about the economics of India.” → query analysis marks it as complex → we route it to web search and get updated economic data.
+
+For a highly complex query: “What are the internal policies of company XYZ in India?” → query analysis routes to retriever → if documents are irrelevant, query rewriting kicks in until relevant docs are found → then generation produces the answer.
+
+Now let’s connect all this in the workflow. The input query enters → the query classifier decides whether to go to direct LLM, web search, or retriever. If it goes to web search, we generate the answer, and if the answer is insufficient, we can still transform the query and send it to retriever. If it goes to retriever, we grade the documents. If relevant, we generate. If not, we rewrite the query, re-retrieve, and repeat until we get meaningful content.
+
+So to summarize: In Agentic RAG, an agent made the decision on which route to take. In Adaptive RAG, we use a classifier to analyze the query and route it based on complexity. For simple queries → direct answer. For moderately complex queries → web search. For highly complex or domain-specific queries → retriever with the self-reflection loop.
+
+In the next video, we will go step by step through the actual implementation of this Adaptive RAG workflow in code, building the classifier, connecting the retriever, adding self-reflection, and running examples. I hope you found this explanation helpful. I’ll see you in the next video. Thank you, and take care.
 
 
