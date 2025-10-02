@@ -2771,45 +2771,20 @@ I hope you found this explanation helpful. I’ll see you in the next video. Tha
 
 **G) Adaptive RAG Implementation**
 
-Hello guys, in this video we are going to continue our discussion on different types of Retrieval Augmented Generation (RAG). In the previous video, we implemented something called Agentic RAG. We understood how Agentic RAG works, took a concrete example, and walked through the workflow step by step.
+Hello guys. In this video, we are going to continue our discussion on Adaptive RAG, focusing specifically on the implementation. In the rags folder, I have created a second file called AdaptiveRAG.py. As we discussed in theory, the workflow we are going to implement includes Query Analysis and RAG with Self-Reflection. Based on this workflow, there are multiple nodes: web search, vector store retriever, generate node, transform query node, and grade documents node. We will implement these nodes step by step and then connect them using a state graph.
 
-Now, in this specific video, and in the upcoming ones, we are going to focus on Adaptive RAG. I’ve included multiple diagrams to make sure the theoretical intuition is clear before we move on to the practical implementation. The workflow we are going to implement looks a bit complex, but we will break it down step by step.
+First, we need to import the required libraries. You can load environment variables using dotenv, set your OpenAI API key, and any other API keys as required, such as Tabulae for web search. For this example, we will mainly use OpenAI, as it efficiently handles the routing classifier and query analysis:
 
-So, what is Adaptive RAG? Adaptive RAG, or Adaptive Retrieval Augmented Generation, is a framework that dynamically adjusts its strategy for handling queries based on their complexity. This is a very important point—Adaptive RAG is all about adapting the retrieval strategy depending on whether the query is simple, moderately complex, or highly complex. Think of it like a smart assistant that knows when to give a quick, straightforward answer, and when to dig deeper into external sources, databases, or multi-step reasoning. Instead of a rigid one-size-fits-all approach, Adaptive RAG chooses the most appropriate retrieval method for each query, balancing speed and accuracy.
+"from dotenv import load_dotenv
+import os
+load_dotenv()
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')"
 
-If you recall Agentic RAG, in that case it was the agent that decided which route to take. But here, there’s no explicit agent making that decision. Instead, Adaptive RAG uses a classifier or query analysis module that dynamically adjusts the strategy. So, in Adaptive RAG there are two important steps: Query Analysis and RAG + Self-Reflection (Self-Corrective RAG).
-
-Let’s begin with Step 1: Query Analysis. The first stage is query analysis. Looking at the diagram, you can see that whenever a question comes in, it first passes through the query analysis step. The role of query analysis is simple: it determines the complexity of the query and then routes it to the most suitable retrieval method. For example: if the query is very simple, we might just pass it directly to the LLM and get an answer. If the query is moderately complex, we might need a web search to bring in relevant, fresh information. And if the query is highly complex or very domain-specific, then we route it to the retriever connected to a vector database containing internal knowledge.
-
-To implement this query analysis router, we can start with a Pydantic model to validate our classifier output. Inside Python, we can define:
-
-"from pydantic import BaseModel, Field
-from typing import Literal
-
-class RouteQuery(BaseModel):
- data_source: Literal['direct', 'websearch', 'retriever'] = Field(description='Route user query')"
-
-This ensures the classifier output is always one of three: direct, websearch, or retriever. Next, we can build the router prompt. For example:
-
-"from langchain.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
-
-router_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)
-
-route_prompt = ChatPromptTemplate.from_messages([
- ('system', 'You are an expert router. Classify whether a query should be answered directly by the LLM, needs a web search, or requires the vector retriever.'),
- ('human', '{question}')
-])"
-
-So now, when I ask something like “What is the capital of India?” the router returns direct. If I ask “Talk about the economics of India” it routes to websearch. And if I ask “What are the internal policies of company XYZ in India?” it routes to retriever.
-
-Now moving to Step 2: RAG + Self-Reflection (Self-Corrective RAG). Imagine we have a complex query that requires internal company knowledge, like “What are the policies for company XYZ in India?” In this case, query analysis realizes that a web search alone won’t work, since this information may not be fully available on the internet. Instead, the query is routed to the retriever.
-
-The retriever is connected to a vector database, which contains indexed documents about the company. Let’s set up a retriever in Python. We can do this by first loading documents, splitting them, and embedding them:
+Next, we will create a retriever vector store similar to what we did in Agentic RAG. We start by loading documents from URLs, splitting them into chunks, and embedding them as vectors. This allows the retriever to efficiently fetch relevant documents:
 
 "from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
 urls = ['https://example.com/agents
@@ -2827,54 +2802,72 @@ embeddings = OpenAIEmbeddings()
 vectorstore = FAISS.from_documents(split_docs, embeddings)
 retriever = vectorstore.as_retriever()"
 
-Now here’s the interesting part: if the initial retrieval doesn’t give sufficient results, Adaptive RAG can rewrite the query and try again. This process of rewriting, regenerating, and verifying is what we call self-reflection.
+With the retriever ready, we can now implement Query Analysis, which decides whether a query should go to the web search or the vector store retriever. We create a Pydantic data model to validate this routing:
 
-So the loop works like this: query goes to retriever → retrieved documents are graded for relevance → if relevant, we generate an answer → if not, we rewrite the query and re-run retrieval.
+"from pydantic import BaseModel, Field
+from typing import Literal
 
-To grade documents, we can define a simple relevance grader:
+class RootQuery(BaseModel):
+ data_source: Literal['vector', 'websearch'] = Field(description='Route the query to the appropriate data source')"
 
-"from pydantic import BaseModel
+We then define a structured LLM router using OpenAI:
 
-class GradeDocs(BaseModel):
- score: Literal['yes', 'no']
+"from langchain.prompts import ChatPromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.output_parsers import PydanticOutputParser
 
-grader_prompt = ChatPromptTemplate.from_messages([
- ('system', 'You are a grader. If the retrieved document is relevant to the user question, return yes else no.'),
+router_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)
+route_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are an expert router. Classify whether a query should go to vector store or web search.'),
+ ('human', '{question}')
+])
+parser = PydanticOutputParser(pydantic_object=RootQuery)"
+
+Now, when we invoke the question router:
+
+"question_router.invoke('Who won the Cricket World Cup 2023?')"
+
+the router correctly decides websearch, while for “What are the types of agent memory?” it routes to vector. This completes the query analysis node, allowing us to dynamically route queries based on the content of our retriever.
+
+Next, we implement Retrieve + Grade Documents. Here, after the retriever fetches documents, we grade their relevance using another structured LLM output. The grader returns a binary score yes or no:
+
+"grader_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'You are a grader. Assess whether the retrieved document is relevant to the user question.'),
  ('human', 'Question: {question}\nDocument: {doc}')
 ])
 
-grader_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)"
+grader_llm = ChatOpenAI(model='gpt-4o-mini', temperature=0)
+parser = PydanticOutputParser(pydantic_object=GradeDocs)"
 
-If the score is "no", we pass the query to a query rewriter node:
-
-"rewrite_prompt = ChatPromptTemplate.from_messages([
- ('system', 'Rewrite the user question to optimize it for vector retrieval.'),
- ('human', '{question}')
-])"
-
-This way, poorly phrased queries are improved automatically.
-
-Finally, when documents are relevant, we generate the answer using a RAG prompt:
+If the document is relevant (yes), we move to the generate node. This node produces the answer using the context from retrieved documents:
 
 "gen_prompt = ChatPromptTemplate.from_messages([
- ('system', 'You are a helpful assistant. Answer based strictly on the provided context.'),
+ ('system', 'You are a helpful assistant. Answer strictly based on the provided context.'),
  ('human', 'Question: {question}\nContext: {docs}')
 ])
 
-generator = gen_prompt | ChatOpenAI(model='gpt-4o-mini')"
+generator = ChatOpenAI(model='gpt-4o-mini', temperature=0)
+response = generator.invoke({'question': 'What is agent memory?', 'docs': retrieved_docs})"
 
-Now let’s see examples of query analysis in action.
+We also implement a hallucination check, which verifies whether the generated answer is grounded in the retrieved documents. The output is another binary score yes or no. If the output is no, the query is passed to the question rewriter node. This node rewrites the question for better vector retrieval:
 
-For a simple query: “What is the capital of India?” → query analysis marks it as simple → we directly answer using the LLM.
+"rewrite_prompt = ChatPromptTemplate.from_messages([
+ ('system', 'Rewrite the user question to optimize vector search retrieval.'),
+ ('human', '{question}')
+])
 
-For a moderate query: “Talk about the economics of India.” → query analysis marks it as complex → we route it to web search and get updated economic data.
+rewritten_question = router_llm.invoke({'question': 'What is agent memory?'})"
 
-For a highly complex query: “What are the internal policies of company XYZ in India?” → query analysis routes to retriever → if documents are irrelevant, query rewriting kicks in until relevant docs are found → then generation produces the answer.
+Finally, we implement the web search node, which uses an API to fetch information when the retriever does not contain the data. Once the web search result is obtained, it passes through the same generate and hallucination check flow.
 
-Now let’s connect all this in the workflow. The input query enters → the query classifier decides whether to go to direct LLM, web search, or retriever. If it goes to web search, we generate the answer, and if the answer is insufficient, we can still transform the query and send it to retriever. If it goes to retriever, we grade the documents. If relevant, we generate. If not, we rewrite the query, re-retrieve, and repeat until we get meaningful content.
+All of these nodes are then connected using a state graph. The root query is routed either to web search or retriever. Web search flows to generate, while the retriever flows to grade documents. Based on the grader’s output, the state graph decides whether to generate, transform the query, or rewrite. After generation, we also optionally run hallucination checks and then provide the final answer.
 
-So to summarize: In Agentic RAG, an agent made the decision on which route to take. In Adaptive RAG, we use a classifier to analyze the query and route it based on complexity. For simple queries → direct answer. For moderately complex queries → web search. For highly complex or domain-specific queries → retriever with the self-reflection loop.
+When executed, the workflow dynamically decides the path:
 
-In the next video, we will go step by step through the actual implementation of this Adaptive RAG workflow in code, building the classifier, connecting the retriever, adding self-reflection, and running examples. I hope you found this explanation helpful. I’ll see you in the next video. Thank you, and take care.
+Query: “What is machine learning?” → not in retriever → goes to web search → generate → hallucination check → final answer.
 
+Query: “What is agent memory?” → present in retriever → grade documents → generate → hallucination check → final answer.
 
+This demonstrates the Adaptive RAG workflow in practice, combining query analysis, retrieval, self-reflection, and generation in a modular, node-based system. Each node uses the LLM in some way, ensuring both flexibility and accuracy.
+
+I hope this example helps you understand how to implement Adaptive RAG end-to-end. In the next video, we will explore additional optimizations and real-world deployments of this system. Thank you, and take care.
